@@ -1,6 +1,10 @@
+// project.cpp
+// Full integrated project with pathFinding.h usage (uses pathFinding.h as you requested)
+
 #include <iostream>
-#include "linkedList.cpp" 
+#include "linkedList.h"
 #include <SFML/Graphics.hpp>
+#include "Graph.h"
 #include <fstream>
 #include <sstream>
 #include <cmath>
@@ -8,106 +12,6 @@
 #include <string>
 
 using namespace std;
-
-// --- Data Structures ---
-struct Port{
-    string name = "";
-    int portCharge = 0;
-
-    Port(){}
-
-    Port(string n, int chrg)  {
-        name = n;
-        portCharge = chrg;
-    }
-};
-
-struct Route {
-    Port startPoint;
-    Port dest;
-    string date; 
-    string deptTime;
-    string arrTime;
-    int cost;
-    string company;
-};
-
-struct Vertex {
-    Port port;
-    LinkedList<Route> routes;
-
-    // --- Added fields for pathfinding (Day 2 prep) ---
-    int minCost = 2147483647; // Simulating infinity
-    int parentIndex = -1; 
-    
-    void addPort(Port p1) {
-        port = p1;
-    }
-};
-
-class Graph {
-public:
-    Vertex* vertices = nullptr;
-    int size = 0;
-
-    void addPorts(string dest) {
-        fstream myFile(dest);
-        string portName;
-        int charge;
-
-        int count = 0;
-        // First pass: Count ports to allocate memory
-        while (myFile >> portName >> charge) count++;
-
-        size = count;
-        vertices = new Vertex[size];
-
-        myFile.clear();
-        myFile.seekg(0, ios::beg);
-
-        // Second pass: Populate vertices
-        count = 0;
-        while (myFile >> portName >> charge) {
-            vertices[count++].addPort(Port(portName, charge));
-        }
-        myFile.close();
-    }
-
-    int findPort(const string& name) {
-        for (int i = 0; i < size; i++)
-            if (vertices[i].port.name == name) return i;
-        return -1;
-    }
-
-    void addRoutes(string fileName) {
-        ifstream file(fileName);
-        string start, dest, date, dept, arr, company;
-        int cost;
-
-        while (file >> start >> dest >> date >> dept >> arr >> cost >> company) {
-            int u = findPort(start);
-            int v = findPort(dest);
-
-            if (u == -1 || v == -1) continue;
-
-            Route r;
-            r.startPoint = vertices[u].port;
-            r.dest = vertices[v].port;
-            r.date = date; // Store the date
-            r.deptTime = dept;
-            r.arrTime = arr;
-            r.cost = cost;
-            r.company = company;
-
-            vertices[u].routes.insertEnd(r);
-        }
-    }
-    
-    // Add destructor to clean up allocated memory
-    ~Graph() {
-        delete[] vertices;
-    }
-};
 
 
 int main() {
@@ -141,9 +45,6 @@ int main() {
         return 1;
     }
 
-    // --------------------------
-    // Fixed positions for ports
-    // --------------------------
     vector<sf::Vector2f> positions = {
         {1150.f, 330.f},   // Chittagong
         {1050.f, 300.f},  // Karachi
@@ -198,7 +99,7 @@ int main() {
         // Node
         nodes[i].setRadius(nodeRadius);
         nodes[i].setOrigin(nodeRadius, nodeRadius);
-        if (i < positions.size()) nodes[i].setPosition(positions[i]);
+        if (i < (int)positions.size()) nodes[i].setPosition(positions[i]);
         nodes[i].setFillColor(sf::Color::Cyan);
         nodes[i].setOutlineColor(sf::Color::Black);
         nodes[i].setOutlineThickness(1.f);
@@ -213,12 +114,9 @@ int main() {
 
         auto b = labels[i].getLocalBounds();
         labels[i].setOrigin(b.width / 2, b.height + 5); 
-        if (i < positions.size()) labels[i].setPosition(positions[i].x, positions[i].y - nodeRadius - 5);
+        if (i < (int)positions.size()) labels[i].setPosition(positions[i].x, positions[i].y - nodeRadius - 5);
     }
 
-    // -----------------------------
-    // Sliding Panel Setup
-    // -----------------------------
     const float panelWidth = 350;
     float panelX = -panelWidth;
     bool panelOpen = false;
@@ -291,8 +189,13 @@ int main() {
     // --- Submenu Items ---
     
     // Submenu 1 (Route Finder)
+    sf::RectangleShape submenuRect1(menuSize);
+    sf::RectangleShape submenuRect2(menuSize);
     sf::Text sub1_A("A. Find Shortest TIME Route", font, 18);
     sf::Text sub1_B("B. Find Cheapest COST Route", font, 18);
+    submenuRect1.setFillColor(menuColor);
+    submenuRect2.setFillColor(menuColor);
+    // submenuRect1.setPosition(20)
     
     // Submenu 2 (Booking)
     sf::Text sub2_A("A. Select Route and Date", font, 18);
@@ -312,9 +215,7 @@ int main() {
 
     float subYStart = 160.f;
 
-    // --------------------------
-    // Dropdown (Option B) state
-    // --------------------------
+
     bool selectingOrigin = false;
     bool selectingDest = false;
     int selectedOriginIndex = -1;
@@ -349,147 +250,108 @@ int main() {
     sf::Text upTxt("^", font, 16), downTxt("v", font, 16);
     upTxt.setFillColor(sf::Color::White); downTxt.setFillColor(sf::Color::White);
 
-    // --------------------------
-    // Main SFML loop
-    // --------------------------
+
     while (window.isOpen()) {
         sf::Event e;
         while (window.pollEvent(e)) {
             if (e.type == sf::Event::Closed) window.close();
 
-            // Toggle panel using 'P' key (Good fallback)
+            // Toggle panel using 'P' key
             if (e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::P) {
-                // only allow collapsing/opening if not in the middle of choosing ports (user must finish)
                 if (!selectingOrigin && !selectingDest) panelOpen = !panelOpen;
             }
 
+            // Scroll for port list
             if (e.type == sf::Event::MouseWheelScrolled) {
-                // Only affect scrolling when the port list is visible (dropdown active) and panel is open
                 if (panelOpen && (selectingOrigin || selectingDest)) {
-                    if (e.mouseWheelScroll.delta > 0) listOffset -= 1;
-                    else listOffset += 1;
+                    if (e.mouseWheelScroll.delta > 0) listOffset--;
+                    else listOffset++;
                     if (listOffset < 0) listOffset = 0;
-                    // count available items for the list excluding the mutual selection
                     int available = graph.size - ((selectingOrigin && selectedDestIndex!=-1) || (selectingDest && selectedOriginIndex!=-1) ? 1 : 0);
-                    if (listOffset > max(0, available - maxVisibleItems)) listOffset = max(0, available - maxVisibleItems);
+                    if (listOffset > std::max(0, available - maxVisibleItems)) listOffset = std::max(0, available - maxVisibleItems);
                 }
             }
 
             if (e.type == sf::Event::MouseButtonPressed) {
                 sf::Vector2f mouseGlobal(sf::Mouse::getPosition(window));
-                
-                // 1. STATIC TOGGLE BUTTON CLICK (Open the panel)
+
+                // STATIC TOGGLE BUTTON
                 if (!panelOpen && toggleBtn.getGlobalBounds().contains(mouseGlobal)) {
                     panelOpen = true;
+                    continue;
                 }
 
-                // Panel-relative mouse (only meaningful when panel is open)
                 if (panelOpen) {
                     sf::Vector2f panelMouse(mouseGlobal.x - panelX, mouseGlobal.y);
 
-                    // If currently selecting origin/dest, clicks in port list area will select items
+                    // Origin/Destination dropdown selection
                     if (selectingOrigin || selectingDest) {
-                        // compute visible list and clickable rectangles
-                        int idxVis = 0;
-                        int drawIndex = 0;
+                        int visibleCount = 0;
+                        int skipCount = 0;
                         for (int realIndex = 0; realIndex < graph.size; realIndex++) {
-                            // Skip the item if it's equal to the opposite selection
                             if (selectingOrigin && selectedDestIndex == realIndex) continue;
                             if (selectingDest && selectedOriginIndex == realIndex) continue;
+                            if (skipCount < listOffset) { skipCount++; continue; }
+                            if (visibleCount >= maxVisibleItems) break;
 
-                            if (idxVis >= listOffset && drawIndex < maxVisibleItems) {
-                                float y = portListStartY + drawIndex * (portItemHeight + 6);
-                                sf::FloatRect itemRect(panelX + 40, y, 270.f, portItemHeight);
-                                if (itemRect.contains(mouseGlobal)) {
-                                    // Select this port
-                                    if (selectingOrigin) {
-                                        selectedOriginIndex = realIndex;
-                                        // mutual exclusion: if same as dest, clear dest
-                                        if (selectedDestIndex == selectedOriginIndex) selectedDestIndex = -1;
-                                        selectingOrigin = false;
-                                        listOffset = 0;
-                                    } else {
-                                        selectedDestIndex = realIndex;
-                                        if (selectedOriginIndex == selectedDestIndex) selectedOriginIndex = -1;
-                                        selectingDest = false;
-                                        listOffset = 0;
-                                    }
-                                    break;
+                            float y = portListStartY + visibleCount * (portItemHeight + 6);
+                            sf::FloatRect itemRect(panelX + 40, y, 270.f, portItemHeight);
+
+                            if (itemRect.contains(mouseGlobal)) {
+                                if (selectingOrigin) {
+                                    selectedOriginIndex = realIndex;
+                                    if (selectedDestIndex == selectedOriginIndex) selectedDestIndex = -1;
+                                    selectingOrigin = false;
+                                } else {
+                                    selectedDestIndex = realIndex;
+                                    if (selectedOriginIndex == selectedDestIndex) selectedOriginIndex = -1;
+                                    selectingDest = false;
                                 }
-                                drawIndex++;
+                                listOffset = 0;
+                                break;
                             }
-                            idxVis++;
+                            visibleCount++;
                         }
 
-                        // Click outside the list closes selection
-                        // If user clicked somewhere else in panel area outside list, close the dropdown
-                        // We'll consider list area as between portListStartY and portListStartY + maxVisibleItems*height
                         float listTop = portListStartY;
                         float listBottom = portListStartY + maxVisibleItems * (portItemHeight + 6);
-                        if (!(panelMouse.x >= 40 && panelMouse.x <= 40 + 270.f && panelMouse.y >= listTop && panelMouse.y <= listBottom)) {
-                            // if clicked outside list area, close dropdown (but keep panel open)
-                            selectingOrigin = false;
-                            selectingDest = false;
-                            listOffset = 0;
-                        }
-
-                        // consume further button handling this click
-                        continue;
-                    } // end selecting Origin/Dest block
-
-                    // --- Regular panel buttons when not selecting list ---
-                    // Close button (only on main menu)
-                    if (currentMenu == 0) {
-                        sf::FloatRect closeRect(closeBtn.getPosition().x, closeBtn.getPosition().y, closeBtn.getSize().x, closeBtn.getSize().y);
-                        if (closeRect.contains(panelMouse)) {
-                            // Only allow close if not in dropdown selection states
-                            if (!selectingOrigin && !selectingDest) panelOpen = false;
-                            continue;
-                        }
-                    } else {
-                        // Back button (only if inside submenu)
-                        sf::FloatRect backRect(backBtn.getPosition().x, backBtn.getPosition().y, backBtn.getSize().x, backBtn.getSize().y);
-                        if (backRect.contains(panelMouse)) {
-                            currentMenu = 0;
-                            // ensure selection states cleared
+                        if (!(panelMouse.x >= 40 && panelMouse.x <= 40 + 270.f &&
+                            panelMouse.y >= listTop && panelMouse.y <= listBottom)) {
                             selectingOrigin = selectingDest = false;
                             listOffset = 0;
-                            continue;
                         }
+                        continue; // consume event
                     }
 
-                    // Main Menu selection
+                    // Close button
+                    if (currentMenu == 0 && closeBtn.getGlobalBounds().contains(mouseGlobal)) {
+                        panelOpen = false;
+                        continue;
+                    }
+
+                    // Back button
+                    if (currentMenu != 0 && backBtn.getGlobalBounds().contains(mouseGlobal)) {
+                        currentMenu = 0;
+                        selectingOrigin = selectingDest = false;
+                        listOffset = 0;
+                        continue;
+                    }
+
+                    // Main menu selection
                     if (currentMenu == 0) {
-                        if (menuRect1.getGlobalBounds().contains(panelMouse)) { currentMenu = 1; selectingOrigin = selectingDest = false; listOffset = 0; continue; }
-                        if (menuRect2.getGlobalBounds().contains(panelMouse)) { currentMenu = 2; selectingOrigin = selectingDest = false; listOffset = 0; continue; }
-                        if (menuRect3.getGlobalBounds().contains(panelMouse)) { currentMenu = 3; selectingOrigin = selectingDest = false; listOffset = 0; continue; }
-                    } else {
-                        // Inside submenu: detect clicks on the Origin/Destination fields
-                        // compute field rectangles (they were placed relative to panelX)
-                        sf::FloatRect originFieldRect(panelX + 20, subYStart + 10, fieldOrigin.getSize().x, fieldOrigin.getSize().y);
-                        sf::FloatRect destFieldRect(panelX + 20, subYStart + 60, fieldDest.getSize().x, fieldDest.getSize().y);
-
-                        if (originFieldRect.contains(mouseGlobal)) {
-                            // open origin dropdown
-                            selectingOrigin = true;
-                            selectingDest = false;
-                            listOffset = 0;
-                            continue;
-                        }
-                        if (destFieldRect.contains(mouseGlobal)) {
-                            // open dest dropdown
-                            selectingDest = true;
-                            selectingOrigin = false;
-                            listOffset = 0;
-                            continue;
-                        }
-
-                        // If clicking submenu-specific options (like sub1_A / sub1_B) - placeholder
-                        // You can add logic here to run algorithms once origin & dest selected
-                    } // end submenu handling
-                } // end panelOpen if
-            } // end MouseButtonPressed
-        } // end event poll loop
+                        if (menuRect1.getGlobalBounds().contains(mouseGlobal)) { currentMenu = 1; continue; }
+                        if (menuRect2.getGlobalBounds().contains(mouseGlobal)) { currentMenu = 2; continue; }
+                        if (menuRect3.getGlobalBounds().contains(mouseGlobal)) { currentMenu = 3; continue; }
+                    } 
+                    // Submenu handling
+                    else if (currentMenu == 1) {
+                        if (fieldOrigin.getGlobalBounds().contains(mouseGlobal)) { selectingOrigin = true; selectingDest = false; continue; }
+                        if (fieldDest.getGlobalBounds().contains(mouseGlobal)) { selectingDest = true; selectingOrigin = false; continue; }
+                        
+                    }
+                }
+            }
+        }
 
         // Animate panel
         if (panelOpen && panelX < 0) panelX += 20;
@@ -513,8 +375,11 @@ int main() {
         menu3.setPosition(panelX + 25, menuRect3.getPosition().y + 10);
         
         // Update Sub Menu positions
-        sub1_A.setPosition(panelX + 40, subYStart + 0 * (menuSize.y + spacing) + 150);
-        sub1_B.setPosition(panelX + 40, subYStart + 1 * (menuSize.y + spacing) + 150);
+        submenuRect1.setPosition(panelX + 20, subYStart + 0 * (menuSize.y + spacing) + 150);
+        submenuRect2.setPosition(panelX + 20, subYStart + 1 * (menuSize.y + spacing) + 150);
+        sub1_A.setPosition(submenuRect1.getPosition().x + 5 , submenuRect1.getPosition().y + 10) ;
+        sub1_B.setPosition(submenuRect2.getPosition().x + 5 , submenuRect2.getPosition().y + 10);
+        
         
         sub2_A.setPosition(panelX + 40, subYStart + 0 * (menuSize.y + spacing)+ 150);
         sub2_B.setPosition(panelX + 40, subYStart + 1 * (menuSize.y + spacing)+ 150);
@@ -537,29 +402,20 @@ int main() {
         window.clear();
         window.draw(mapSprite);
 
-        // Draw routes (faded)
-        // for (int i = 0; i < graph.size; i++) {
-        //     auto* cur = graph.vertices[i].routes.head;
-        //     while (cur) {
-        //         int j = graph.findPort(cur->data.dest.name);
-        //         if (j != -1) {
-        //             sf::Vertex line[] = {
-        //                 sf::Vertex(positions[i], sf::Color(100, 100, 100, 150)),
-        //                 sf::Vertex(positions[j], sf::Color(100, 100, 100, 150))
-        //             };
-        //             window.draw(line, 2, sf::Lines);
-        //         }
-        //         cur = cur->next;
-        //     }
-        // }
-
         // Draw nodes and labels (hide leftmost region under panel when open)
         for (int i = 0; i < graph.size; i++) {
             if (!panelOpen || nodes[i].getPosition().x > panelWidth) {
+                // If path includes this node, highlight it
+                
+                nodes[i].setFillColor(sf::Color::Cyan);
+                nodes[i].setRadius(nodeRadius);
+                nodes[i].setOrigin(nodeRadius, nodeRadius);
+
                 window.draw(nodes[i]);
                 window.draw(labels[i]);
             }
         }
+
 
         // Draw Panel and Menu Items
         window.draw(panel);
@@ -584,6 +440,8 @@ int main() {
                 header.setPosition(panelX + 15, subYStart - 40);
                 window.draw(header);
                 
+                window.draw(submenuRect1);
+                window.draw(submenuRect2);
                 window.draw(sub1_A);
                 window.draw(sub1_B);
 

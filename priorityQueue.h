@@ -6,33 +6,77 @@
 template <typename T>
 class PriorityQueue {
 private:
-    struct HeapNode {
+    struct Node {
         T data;
         int priority;
-        HeapNode(T d, int p) : data(d), priority(p) {}
+        Node* next;
+
+        Node(T d, int p) : data(d), priority(p), next(nullptr) {}
     };
-    
-    HeapNode** heap;
-    int capacity;
+
+    Node* head;    // always points to smallest priority
     int size;
-    
-    void heapifyUp(int index);
-    void heapifyDown(int index);
-    void resize();
-    int parent(int i) { return (i - 1) / 2; }
-    int leftChild(int i) { return 2 * i + 1; }
-    int rightChild(int i) { return 2 * i + 2; }
 
 public:
-    PriorityQueue(int cap = 100);
-    ~PriorityQueue();
-    
-    void push(T data, int priority);
-    T pop();
-    T top() const;
-    bool isEmpty() const { return size == 0; }
-    int getSize() const { return size; }
-    void clear();
+    PriorityQueue() : head(nullptr), size(0) {}
+
+    ~PriorityQueue() {
+        clear();
+    }
+
+    void push(T data, int priority) {
+        Node* newNode = new Node(data, priority);
+
+        // Insert at beginning if queue empty or smaller priority
+        if (!head || priority < head->priority) {
+            newNode->next = head;
+            head = newNode;
+        } else {
+            // Otherwise find correct sorted position
+            Node* current = head;
+            while (current->next && current->next->priority <= priority) {
+                current = current->next;
+            }
+            newNode->next = current->next;
+            current->next = newNode;
+        }
+
+        size++;
+    }
+
+    T pop() {
+        if (!head) throw std::runtime_error("Priority queue is empty");
+
+        Node* temp = head;
+        T result = temp->data;
+        head = head->next;
+        delete temp;
+
+        size--;
+        return result;
+    }
+
+    T top() const {
+        if (!head) throw std::runtime_error("Priority queue is empty");
+        return head->data;
+    }
+
+    bool isEmpty() const {
+        return head == nullptr;
+    }
+
+    int getSize() const {
+        return size;
+    }
+
+    void clear() {
+        while (head) {
+            Node* temp = head;
+            head = head->next;
+            delete temp;
+        }
+        size = 0;
+    }
 };
 
 #endif
