@@ -23,6 +23,11 @@ public:
         // Simple approximation: assume 30 days per month
         return year * 365 + month * 30 + day;
     }
+
+    // Convert a date and time to absolute minutes (rough epoch)
+    static int toAbsoluteMinutes(const string& date, const string& time) {
+        return dateToDays(date) * 24 * 60 + timeToMinutes(time);
+    }
     
     // Calculate time difference in minutes (handles day overflow)
     static int timeDifference(const string& date1, const string& time1,
@@ -41,6 +46,18 @@ public:
                                      int minLayoverMinutes = 60) {
         int diff = timeDifference(arrDate, arrTime, depDate, depTime);
         return diff >= minLayoverMinutes;
+    }
+
+    // Compute arrival absolute minutes, adding 24h if arrival clock is earlier than departure clock.
+    static int absoluteArrivalMinutes(const string& depDate, const string& depTime,
+                                      const string& arrDate, const string& arrTime) {
+        int depAbs = toAbsoluteMinutes(depDate, depTime);
+        int arrAbs = toAbsoluteMinutes(arrDate, arrTime);
+        if (arrAbs < depAbs) {
+            // crossed midnight (or date omission), roll to next day
+            arrAbs += 24 * 60;
+        }
+        return arrAbs;
     }
     
     // Convert minutes to "HH:MM" format
