@@ -5,7 +5,6 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
-#include <vector>
 #include <string>
 #include <iomanip>
 
@@ -18,6 +17,7 @@
 #include "mainMenu.hpp"
 #include "routeFindingMenu.hpp"
 #include "preferencesMenu.hpp"
+#include "bookingMenu.hpp"
 #include "portInitializer.hpp"
 #include "uiPanel.hpp"
 
@@ -89,6 +89,7 @@ int main() {
     MainMenu mainMenu(font);
     RouteFindingMenu routeMenu(font);
     PreferencesMenu preferencesMenu(graph, font);
+    BookingMenu bookingMenu(graph, font);
 
     // --- MAIN LOOP ---
     while (window.isOpen()) {
@@ -100,6 +101,7 @@ int main() {
         mainMenu.updatePositions(uiPanel.panelX);
         routeMenu.updatePositions(uiPanel.panelX, winH);
         preferencesMenu.updatePositions(uiPanel.panelX, winH);
+        bookingMenu.updatePositions(uiPanel.panelX, winH);
 
         sf::Event e;
         while (window.pollEvent(e)) {
@@ -108,7 +110,8 @@ int main() {
             if (e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::P) {
                 if (!routeMenu.selectingOrigin && !routeMenu.selectingDest &&
                     !preferencesMenu.selectingOrigin && !preferencesMenu.selectingDest &&
-                    !preferencesMenu.selectingPorts && !preferencesMenu.selectingCompanies) {
+                    !preferencesMenu.selectingPorts && !preferencesMenu.selectingCompanies &&
+                    !bookingMenu.selectingOrigin && !bookingMenu.selectingDest && !bookingMenu.selectingDate) {
                     uiPanel.panelOpen = !uiPanel.panelOpen;
                 }
             }
@@ -127,6 +130,9 @@ int main() {
                     else if (preferencesMenu.selectingCompanies) {
                         preferencesMenu.handleMouseWheel(e.mouseWheelScroll.delta, false, false, graph);
                     }
+                    else if (bookingMenu.selectingOrigin || bookingMenu.selectingDest || bookingMenu.selectingDate) {
+                        bookingMenu.handleMouseWheel(e.mouseWheelScroll.delta, graph);
+                    }
                 }
             }
 
@@ -143,12 +149,21 @@ int main() {
                         currentMenu = 0;
                         routeMenu.reset();
                         preferencesMenu.reset();
-                        // Check if currentPathResult is in filteredRoutes before deleting
+                        bookingMenu.reset();
+                        // Check if currentPathResult is in filteredRoutes or availableRoutes before deleting
                         bool isInFiltered = false;
-                        for (auto* route : preferencesMenu.filteredRoutes) {
-                            if (route == currentPathResult) {
+                        for (int i = 0; i < preferencesMenu.filteredRoutes.size(); i++) {
+                            if (preferencesMenu.filteredRoutes[i] == currentPathResult) {
                                 isInFiltered = true;
                                 break;
+                            }
+                        }
+                        if (!isInFiltered) {
+                            for (int i = 0; i < bookingMenu.availableRoutes.size(); i++) {
+                                if (bookingMenu.availableRoutes[i] == currentPathResult) {
+                                    isInFiltered = true;
+                                    break;
+                                }
                             }
                         }
                         if (currentPathResult && !isInFiltered) {
@@ -167,8 +182,12 @@ int main() {
                                             currentPathResult, resultTextString);
                     }
                     else if (currentMenu == 2) {
-                        preferencesMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH,font,
+                        preferencesMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, font,
                                                    currentPathResult, resultTextString);
+                    }
+                    else if (currentMenu == 3) {
+                        bookingMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, font,
+                                              currentPathResult, resultTextString);
                     }
                 }
             }
@@ -182,7 +201,8 @@ int main() {
         VisualRenderer::drawPath(window, currentPathResult, positions);
         VisualRenderer::drawPorts(window, graph, portSprites, labels, positions, 
                                  currentPathResult, mouseGlobal, baseScale, 
-                                 uiPanel.panelOpen, uiPanel.panelWidth);
+                                 uiPanel.panelOpen, uiPanel.panelWidth,
+                                 preferencesMenu.selectedPorts);
 
         // Draw Panel
         uiPanel.draw(window, currentMenu);
@@ -200,6 +220,10 @@ int main() {
                 else if (currentMenu == 2) {
                     preferencesMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH);
                 }
+                else if (currentMenu == 3) {
+                    bookingMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH,
+                                   currentPathResult, resultTextString);
+                }
             }
         }
         
@@ -207,7 +231,7 @@ int main() {
     }
     
     // Cleanup
-    // Check if currentPathResult is in filteredRoutes to avoid double deletion
+    // Check if currentPathResult is in filteredRoutes or availableRoutes to avoid double deletion
     bool isInFilteredRoutes = false;
     for (auto* route : preferencesMenu.filteredRoutes) {
         if (route == currentPathResult) {
@@ -215,18 +239,28 @@ int main() {
             break;
         }
     }
+    if (!isInFilteredRoutes) {
+        for (auto* route : bookingMenu.availableRoutes) {
+            if (route == currentPathResult) {
+                isInFilteredRoutes = true;
+                break;
+            }
+        }
+    }
     
     // Set currentPathResult to nullptr before cleanup
-    // (preferencesMenu.cleanup() will delete filteredRoutes)
+    // The menus' cleanup() will delete all routes in their vectors
     if (isInFilteredRoutes) {
-        currentPathResult = nullptr;
+        currentPathResult = nullptr;  // Don't delete - it's owned by a menu
     } else if (currentPathResult) {
+        // Only delete if it's not in any menu's vector
         delete currentPathResult;
         currentPathResult = nullptr;
     }
     
-    // Cleanup preferences menu (this will delete filteredRoutes)
+    // Cleanup menus (this will delete filteredRoutes and availableRoutes)
     preferencesMenu.cleanup();
+    bookingMenu.cleanup();
     
     return 0;
 }

@@ -2,17 +2,15 @@
 #define PREFERENCESMENU_HPP
 
 #include <SFML/Graphics.hpp>
-#include <vector>
 #include <string>
-#include <set>
 #include <sstream>
-#include <algorithm>
 #include "Graph.hpp"
 #include "routeFilter.hpp"
 #include "uiHelpers.hpp"
+#include "vector.h"
 
 struct PreferencesMenu {
-    // Origin and Destination selection
+    // 1. Origin and Destination selection
     sf::RectangleShape fieldOrigin;
     sf::RectangleShape fieldDest;
     sf::Text originLabel;
@@ -23,71 +21,72 @@ struct PreferencesMenu {
     int selectedDestIndex;
     int originDestListOffset;
     
-    // Preferred ports (for layovers)
+    // 2. Preferred ports (for layovers)
     sf::RectangleShape portField;
     sf::Text portLabel;
     bool selectingPorts;
-    std::vector<int> selectedPorts;
+    Vector<int> selectedPorts;
     int portListOffset;
     
-    // Preferred companies (for route segments)
+    // 3. Preferred companies (for route segments)
     sf::RectangleShape companyField;
     sf::Text companyLabel;
     bool selectingCompanies;
-    std::vector<std::string> selectedCompanies;
-    std::vector<std::string> allCompanies;
+    Vector<std::string> selectedCompanies;
+    Vector<std::string> allCompanies;
     int companyListOffset;
     
-    // Show Routes button
+    // 4. Show Routes button
     sf::RectangleShape showRoutesBtn;
     sf::Text showRoutesTxt;
     
-    // Navigation buttons
+    // 5. Navigation buttons
     sf::RectangleShape prevBtn;
     sf::RectangleShape nextBtn;
     sf::Text prevBtnTxt;
     sf::Text nextBtnTxt;
     sf::Text routeCounterTxt;
     
-    // Filtered routes
-    std::vector<PathFinding::PathResult*> filteredRoutes;
+    // 6. Filtered routes
+    Vector<PathFinding::PathResult*> filteredRoutes;
     int currentRouteIndex;
     
-    // Results display
+    // 7. Results display
     sf::RectangleShape resultsArea;
     sf::Text resultHeader;
     sf::Text resultBody;
     
     // Tags for selected ports and companies
-    std::vector<sf::RectangleShape> portTags;
-    std::vector<sf::Text> portTagTexts;
-    std::vector<sf::RectangleShape> companyTags;
-    std::vector<sf::Text> companyTagTexts;
+    Vector<sf::RectangleShape> portTags;
+    Vector<sf::Text> portTagTexts;
+    Vector<sf::RectangleShape> companyTags;
+    Vector<sf::Text> companyTagTexts;
     
     sf::Color btnNormal;
     sf::Color btnHover;
     sf::Color selectedColor;
     sf::Color tagColor;
 
+    // --- CONSTRUCTOR: FIXED INITIALIZATION ORDER ---
     PreferencesMenu(const Graph& graph, const sf::Font& font)
         : fieldOrigin(sf::Vector2f(340.f, 40.f)),
           fieldDest(sf::Vector2f(340.f, 40.f)),
-          portField(sf::Vector2f(340.f, 40.f)),
-          companyField(sf::Vector2f(340.f, 40.f)),
-          showRoutesBtn(sf::Vector2f(340.f, 50.f)),
-          prevBtn(sf::Vector2f(50.f, 40.f)),
-          nextBtn(sf::Vector2f(50.f, 40.f)),
-          resultsArea(sf::Vector2f(360.f, 250.f)),
           selectingOrigin(false),
           selectingDest(false),
-          selectingPorts(false),
-          selectingCompanies(false),
           selectedOriginIndex(-1),
           selectedDestIndex(-1),
           originDestListOffset(0),
+          portField(sf::Vector2f(340.f, 40.f)),
+          selectingPorts(false),
           portListOffset(0),
+          companyField(sf::Vector2f(340.f, 40.f)),
+          selectingCompanies(false),
           companyListOffset(0),
+          showRoutesBtn(sf::Vector2f(340.f, 50.f)),
+          prevBtn(sf::Vector2f(50.f, 40.f)),
+          nextBtn(sf::Vector2f(50.f, 40.f)),
           currentRouteIndex(-1),
+          resultsArea(sf::Vector2f(360.f, 250.f)),
           btnNormal(70, 80, 100),
           btnHover(90, 100, 125),
           selectedColor(0, 150, 200),
@@ -203,35 +202,32 @@ struct PreferencesMenu {
 
     void handleMouseWheel(float delta, bool isOriginDest, bool isPortSelection, const Graph& graph) {
         if (isOriginDest) {
-            // Calculate max offset for origin/destination
             int availableItems = 0;
             for (int i = 0; i < graph.size; i++) {
                 if ((selectingOrigin && i == selectedDestIndex) || 
                     (selectingDest && i == selectedOriginIndex)) continue;
                 availableItems++;
             }
-            int maxOffset = std::max(0, availableItems - 6); // 6 visible items
+            int maxOffset = std::max(0, availableItems - 6);
             
             if (delta > 0) originDestListOffset--;
             else originDestListOffset++;
             if (originDestListOffset < 0) originDestListOffset = 0;
             if (originDestListOffset > maxOffset) originDestListOffset = maxOffset;
         } else if (isPortSelection) {
-            // Calculate max offset for ports (excluding origin/destination)
             int availableItems = 0;
             for (int i = 0; i < graph.size; i++) {
                 if (i == selectedOriginIndex || i == selectedDestIndex) continue;
                 availableItems++;
             }
-            int maxOffset = std::max(0, availableItems - 6); // 6 visible items
+            int maxOffset = std::max(0, availableItems - 6);
             
             if (delta > 0) portListOffset--;
             else portListOffset++;
             if (portListOffset < 0) portListOffset = 0;
             if (portListOffset > maxOffset) portListOffset = maxOffset;
         } else {
-            // Calculate max offset for companies
-            int maxOffset = std::max(0, (int)allCompanies.size() - 6); // 6 visible items
+            int maxOffset = std::max(0, (int)allCompanies.size() - 6);
             
             if (delta > 0) companyListOffset--;
             else companyListOffset++;
@@ -240,26 +236,24 @@ struct PreferencesMenu {
         }
     }
 
+    // --- FIX: ADDED FONT PARAMETER FOR ACCURATE HITBOXES ---
     bool handleClick(Graph& graph,
                     const sf::Vector2f& mouseGlobal,
                     float panelX,
                     float winH,
-                    const sf::Font& font,
+                    const sf::Font& font, // Required for calculating layout
                     PathFinding::PathResult*& currentPathResult,
                     std::string& resultTextString) {
         // Handle origin/destination selection
         if (selectingOrigin || selectingDest) {
             return handleOriginDestSelectionClick(graph, mouseGlobal, panelX);
         }
-        // Handle port selection
         else if (selectingPorts) {
             return handlePortSelectionClick(graph, mouseGlobal, panelX);
         }
-        // Handle company selection
         else if (selectingCompanies) {
             return handleCompanySelectionClick(mouseGlobal, panelX);
         }
-        // Handle field clicks
         else if (fieldOrigin.getGlobalBounds().contains(mouseGlobal)) {
             selectingOrigin = true;
             selectingDest = selectingPorts = selectingCompanies = false;
@@ -280,13 +274,12 @@ struct PreferencesMenu {
             selectingOrigin = selectingDest = selectingPorts = false;
             return true;
         }
-        // Handle navigation buttons (check before show routes to prioritize)
-        // Calculate button positions the same way as in draw()
-        if (!filteredRoutes.empty()) {
-            // Calculate exact Y position using the simulation helper
+        
+        // --- FIX: CALCULATE EXACT BUTTON POSITION ---
+        if (filteredRoutes.size() > 0) {
             float navY = calculateLayoutNavY(graph, font, panelX, winH);
             
-            // Reconstruct the hitboxes exactly where draw() puts them
+            // Define hitboxes exactly where draw() places them
             sf::FloatRect prevRect(panelX + 30, navY, 50, 40);
             sf::FloatRect nextRect(panelX + 320, navY, 50, 40);
             
@@ -299,6 +292,7 @@ struct PreferencesMenu {
                 return true;
             }
         }
+        
         // Handle show routes button
         if (showRoutesBtn.getGlobalBounds().contains(mouseGlobal)) {
             if (selectedOriginIndex != -1 && selectedDestIndex != -1) {
@@ -313,44 +307,37 @@ struct PreferencesMenu {
     void applyFilters(Graph& graph, 
                      PathFinding::PathResult*& currentPathResult,
                      std::string& resultTextString) {
-        // Check if currentPathResult is in filteredRoutes before deleting
         bool currentIsInFiltered = false;
-        for (auto* route : filteredRoutes) {
-            if (route == currentPathResult) {
+        for (int i = 0; i < filteredRoutes.size(); i++) {
+            if (filteredRoutes[i] == currentPathResult) {
                 currentIsInFiltered = true;
                 break;
             }
         }
         
-        // Clean up old filtered routes
-        for (auto* route : filteredRoutes) {
-            // Don't delete if it's the currentPathResult (will be handled separately)
-            if (route != currentPathResult) {
-                delete route;
+        for (int i = 0; i < filteredRoutes.size(); i++) {
+            if (filteredRoutes[i] != currentPathResult) {
+                delete filteredRoutes[i];
             }
         }
         filteredRoutes.clear();
         
-        // Now safe to delete currentPathResult if it was in filteredRoutes
         if (currentPathResult && currentIsInFiltered) {
             delete currentPathResult;
             currentPathResult = nullptr;
         }
         
-        // Find filtered routes from origin to destination
         filteredRoutes = RouteFilter::findFilteredRoutes(
             graph, selectedOriginIndex, selectedDestIndex, 
             selectedPorts, selectedCompanies);
         
-        // Set current route
         currentRouteIndex = -1;
-        if (!filteredRoutes.empty()) {
+        if (filteredRoutes.size() > 0) {
             currentRouteIndex = 0;
-            // Only delete currentPathResult if it's not in the new filteredRoutes
             if (currentPathResult) {
                 bool isInNewFiltered = false;
-                for (auto* route : filteredRoutes) {
-                    if (route == currentPathResult) {
+                for (int i = 0; i < filteredRoutes.size(); i++) {
+                    if (filteredRoutes[i] == currentPathResult) {
                         isInNewFiltered = true;
                         break;
                     }
@@ -371,14 +358,12 @@ struct PreferencesMenu {
 
     void navigatePrevious(PathFinding::PathResult*& currentPathResult,
                          std::string& resultTextString) {
-        if (filteredRoutes.empty() || currentRouteIndex <= 0) return;
+        if (filteredRoutes.size() == 0 || currentRouteIndex <= 0) return;
         
         currentRouteIndex--;
-        // Don't delete currentPathResult if it's in filteredRoutes
-        // (it will be managed by filteredRoutes cleanup)
         bool isInFiltered = false;
-        for (auto* route : filteredRoutes) {
-            if (route == currentPathResult) {
+        for (int i = 0; i < filteredRoutes.size(); i++) {
+            if (filteredRoutes[i] == currentPathResult) {
                 isInFiltered = true;
                 break;
             }
@@ -392,15 +377,13 @@ struct PreferencesMenu {
 
     void navigateNext(PathFinding::PathResult*& currentPathResult,
                      std::string& resultTextString) {
-        if (filteredRoutes.empty() || 
-            currentRouteIndex >= (int)filteredRoutes.size() - 1) return;
+        if (filteredRoutes.size() == 0 || 
+            currentRouteIndex >= filteredRoutes.size() - 1) return;
         
         currentRouteIndex++;
-        // Don't delete currentPathResult if it's in filteredRoutes
-        // (it will be managed by filteredRoutes cleanup)
         bool isInFiltered = false;
-        for (auto* route : filteredRoutes) {
-            if (route == currentPathResult) {
+        for (int i = 0; i < filteredRoutes.size(); i++) {
+            if (filteredRoutes[i] == currentPathResult) {
                 isInFiltered = true;
                 break;
             }
@@ -416,18 +399,67 @@ struct PreferencesMenu {
         selectingOrigin = selectingDest = selectingPorts = selectingCompanies = false;
         originDestListOffset = portListOffset = companyListOffset = 0;
         currentRouteIndex = -1;
-        // Note: Don't delete filteredRoutes here - they might be referenced by currentPathResult
-        // Cleanup will handle deletion
     }
 
     void cleanup() {
-        for (auto* route : filteredRoutes) {
-            delete route;
+        for (int i = 0; i < filteredRoutes.size(); i++) {
+            delete filteredRoutes[i];
         }
         filteredRoutes.clear();
     }
 
 private:
+    // --- FIX: HELPER FOR CALCULATING EXACT BUTTON Y POSITION ---
+    float calculateLayoutNavY(const Graph& graph, const sf::Font& font, float panelX, float winH) {
+        float startY = showRoutesBtn.getPosition().y + showRoutesBtn.getSize().y + 10;
+        float tagX = panelX + 30;
+        float tagY = startY;
+        float maxWidth = 340.f;
+        float tagHeight = 25.f;
+        float tagSpacing = 5.f;
+        float maxY = startY;
+
+        // Simulate Port Tags
+        for (int portIdx : selectedPorts) {
+            if (portIdx < 0 || portIdx >= graph.size) continue;
+            std::string name = graph.vertices[portIdx].port.name;
+            sf::Text tempText(name, font, 12);
+            float width = tempText.getLocalBounds().width + 20;
+
+            if (tagX + width > panelX + 30 + maxWidth) {
+                tagX = panelX + 30;
+                tagY += tagHeight + tagSpacing;
+            }
+            maxY = std::max(maxY, tagY + tagHeight);
+            tagX += width + tagSpacing;
+        }
+
+        // Simulate Company Tags
+        if (selectedCompanies.size() > 0) {
+            if (selectedPorts.size() > 0) {
+                tagY = maxY + 10; // Gap between groups
+                tagX = panelX + 30;
+            }
+            
+            for (int i = 0; i < selectedCompanies.size(); i++) {
+                const std::string& company = selectedCompanies[i];
+                sf::Text tempText(company, font, 12);
+                float width = tempText.getLocalBounds().width + 20;
+
+                if (tagX + width > panelX + 30 + maxWidth) {
+                    tagX = panelX + 30;
+                    tagY += tagHeight + tagSpacing;
+                }
+                maxY = std::max(maxY, tagY + tagHeight);
+                tagX += width + tagSpacing;
+            }
+        }
+        
+        // Match the logic in draw(): resultsY = std::min(winH - 180, tagsEndY + 100);
+        float resultsY = std::min(winH - 180, maxY + 100);
+        return resultsY - 50; // Navigation buttons are 50px above results
+    }
+
     bool handleOriginDestSelectionClick(const Graph& graph,
                                        const sf::Vector2f& mouseGlobal,
                                        float panelX) {
@@ -440,7 +472,6 @@ private:
         int skip = 0;
         
         for (int i = 0; i < graph.size; i++) {
-            // Skip if selecting origin and this is the selected destination, or vice versa
             if (selectingOrigin && i == selectedDestIndex) continue;
             if (selectingDest && i == selectedOriginIndex) continue;
             
@@ -479,7 +510,6 @@ private:
         int skip = 0;
         
         for (int i = 0; i < graph.size; i++) {
-            // Don't allow selecting origin or destination as layover ports
             if (i == selectedOriginIndex || i == selectedDestIndex) continue;
             
             if (skip < portListOffset) { skip++; continue; }
@@ -487,10 +517,16 @@ private:
             
             sf::FloatRect itemRect(panelX + 30, startY + visibleIndex * (itemH + 2), 340, itemH);
             if (itemRect.contains(mouseGlobal)) {
-                // Toggle selection
-                auto it = std::find(selectedPorts.begin(), selectedPorts.end(), i);
-                if (it != selectedPorts.end()) {
-                    selectedPorts.erase(it);
+                // Find index of port in selectedPorts (linear search)
+                int foundIndex = -1;
+                for (int j = 0; j < selectedPorts.size(); j++) {
+                    if (selectedPorts[j] == i) {
+                        foundIndex = j;
+                        break;
+                    }
+                }
+                if (foundIndex != -1) {
+                    selectedPorts.erase(foundIndex);
                 } else {
                     selectedPorts.push_back(i);
                 }
@@ -522,10 +558,16 @@ private:
             
             sf::FloatRect itemRect(panelX + 30, startY + visibleIndex * (itemH + 2), 340, itemH);
             if (itemRect.contains(mouseGlobal)) {
-                // Toggle selection
-                auto it = std::find(selectedCompanies.begin(), selectedCompanies.end(), allCompanies[i]);
-                if (it != selectedCompanies.end()) {
-                    selectedCompanies.erase(it);
+                // Find index of company in selectedCompanies (linear search)
+                int foundIndex = -1;
+                for (int j = 0; j < selectedCompanies.size(); j++) {
+                    if (selectedCompanies[j] == allCompanies[i]) {
+                        foundIndex = j;
+                        break;
+                    }
+                }
+                if (foundIndex != -1) {
+                    selectedCompanies.erase(foundIndex);
                 } else {
                     selectedCompanies.push_back(allCompanies[i]);
                 }
@@ -548,13 +590,11 @@ public:
              const sf::Vector2f& mouseGlobal,
              float panelX,
              float winH) {
-        // Draw fields
         window.draw(fieldOrigin);
         window.draw(fieldDest);
         window.draw(portField);
         window.draw(companyField);
         
-        // Update and draw origin label
         if (selectedOriginIndex != -1) {
             originLabel.setString(graph.vertices[selectedOriginIndex].port.name);
             originLabel.setFillColor(sf::Color::White);
@@ -564,7 +604,6 @@ public:
         }
         window.draw(originLabel);
         
-        // Update and draw destination label
         if (selectedDestIndex != -1) {
             destLabel.setString(graph.vertices[selectedDestIndex].port.name);
             destLabel.setFillColor(sf::Color::White);
@@ -574,7 +613,6 @@ public:
         }
         window.draw(destLabel);
         
-        // Update and draw port label
         if (!selectedPorts.empty()) {
             std::stringstream ss;
             ss << selectedPorts.size() << " layover port(s)";
@@ -586,7 +624,6 @@ public:
         }
         window.draw(portLabel);
         
-        // Update and draw company label
         if (!selectedCompanies.empty()) {
             std::stringstream ss;
             ss << selectedCompanies.size() << " company(ies)";
@@ -598,35 +635,22 @@ public:
         }
         window.draw(companyLabel);
         
-        // Draw show routes button
         bool canShowRoutes = (selectedOriginIndex != -1 && selectedDestIndex != -1);
         showRoutesBtn.setFillColor((canShowRoutes && isHovering(showRoutesBtn, mouseGlobal)) ? 
                                    btnHover : (canShowRoutes ? btnNormal : sf::Color(30, 30, 30)));
         window.draw(showRoutesBtn);
         window.draw(showRoutesTxt);
         
-        // Calculate tag area height to adjust results area position
-        float tagAreaHeight = 0;
-        if (!selectedPorts.empty()) {
-            int portRows = (selectedPorts.size() + 2) / 3; // Approximate rows
-            tagAreaHeight += portRows * 30 + 10;
-        }
-        if (!selectedCompanies.empty()) {
-            int companyRows = (selectedCompanies.size() + 2) / 3; // Approximate rows
-            tagAreaHeight += companyRows * 30 + 10;
-            if (!selectedPorts.empty()) tagAreaHeight += 10; // Extra spacing
-        }
-        
-        // Draw tags for selected ports and companies
+        // Draw tags and calculate positions
         float tagsEndY = drawTags(window, graph, font, panelX);
         
-        // Adjust results area position based on tags (lower it)
+        // Adjust results area position based on tags
         float resultsY = std::min(winH - 180, tagsEndY + 100);
         resultsArea.setPosition(panelX + 20, resultsY);
         resultHeader.setPosition(panelX + 35, resultsY + 15);
         resultBody.setPosition(panelX + 35, resultsY + 50);
         
-        // Adjust navigation buttons position (lower them, closer to results)
+        // Adjust navigation buttons position
         float navY = resultsY - 50;
         prevBtn.setPosition(panelX + 30, navY);
         nextBtn.setPosition(panelX + 320, navY);
@@ -634,7 +658,6 @@ public:
         nextBtnTxt.setPosition(panelX + 335, navY + 5);
         routeCounterTxt.setPosition(panelX + 100, navY + 5);
         
-        // Draw navigation buttons if routes are available
         if (!filteredRoutes.empty()) {
             prevBtn.setFillColor((currentRouteIndex > 0 && isHovering(prevBtn, mouseGlobal)) ? 
                                 btnHover : (currentRouteIndex > 0 ? btnNormal : sf::Color(30, 30, 30)));
@@ -648,14 +671,12 @@ public:
             window.draw(nextBtn);
             window.draw(nextBtnTxt);
             
-            // Draw route counter
             std::stringstream ss;
             ss << (currentRouteIndex + 1) << " / " << filteredRoutes.size();
             routeCounterTxt.setString(ss.str());
             window.draw(routeCounterTxt);
         }
         
-        // Draw dropdowns
         if (selectingOrigin || selectingDest) {
             drawOriginDestDropdown(window, graph, font, mouseGlobal, panelX);
         } else if (selectingPorts) {
@@ -663,7 +684,6 @@ public:
         } else if (selectingCompanies) {
             drawCompanyDropdown(window, font, mouseGlobal, panelX);
         } else {
-            // Draw results
             window.draw(resultsArea);
             window.draw(resultHeader);
             
@@ -675,10 +695,9 @@ public:
                 ss << "Stops: " << result->path.getSize() - 2 << "\n";
                 ss << "Path:\n";
                 
-                // Format path with line breaks to prevent overflow (more compact)
                 std::string pathStr = "";
                 int lineLength = 0;
-                const int maxLineLength = 35; // Reduced for smaller modal
+                const int maxLineLength = 35;
                 
                 for (int i = 0; i < result->path.getSize(); i++) {
                     std::string portName = graph.vertices[result->path.get(i)].port.name;
@@ -688,7 +707,6 @@ public:
                         lineLength += 4;
                     }
                     
-                    // Add line break if line would be too long
                     if (lineLength + portName.length() > maxLineLength && i > 0) {
                         pathStr += "\n";
                         lineLength = 0;
@@ -704,74 +722,12 @@ public:
                 ss << "Select origin, destination,\nand preferences";
             }
             resultBody.setString(ss.str());
-            resultBody.setCharacterSize(14); // Smaller font to fit better
+            resultBody.setCharacterSize(14);
             window.draw(resultBody);
         }
     }
 
 private:
-
-    // Helper to calculate exactly where the navigation buttons should be
-    float calculateLayoutNavY(const Graph& graph, const sf::Font& font, float panelX, float winH) {
-        float startY = showRoutesBtn.getPosition().y + showRoutesBtn.getSize().y + 10;
-        float tagX = panelX + 30;
-        float tagY = startY;
-        float maxWidth = 340.f;
-        float tagHeight = 25.f;
-        float tagSpacing = 5.f;
-        float maxY = startY;
-
-        // 1. Simulate Port Tags
-        for (int portIdx : selectedPorts) {
-            if (portIdx < 0 || portIdx >= graph.size) continue;
-            std::string name = graph.vertices[portIdx].port.name;
-            sf::Text tempText(name, font, 12);
-            float width = tempText.getLocalBounds().width + 20;
-
-            if (tagX + width > panelX + 30 + maxWidth) {
-                tagX = panelX + 30;
-                tagY += tagHeight + tagSpacing;
-            }
-            // Track the bottom of the current line
-            maxY = std::max(maxY, tagY + tagHeight);
-            tagX += width + tagSpacing;
-        }
-
-        // 2. Simulate Company Tags
-        if (!selectedCompanies.empty() && !selectedPorts.empty()) {
-            tagY = maxY + 10; // Add spacing between groups (was 30 in draw loop logic, effectively +10 from bottom of prev)
-            // In draw(), it does: tagY += 30. But tagY was usually top of line. 
-            // Let's stick closer to draw logic:
-            // If we just finished a row, tagY is the TOP of that row.
-            // We need to move down past that row (+30 seems to be the logic in drawTags).
-            // Let's assume the safest way is to take the calculated maxY and add gap.
-            tagY += 5; // Adjustment to match visual gap
-            tagX = panelX + 30; 
-        } else if (!selectedCompanies.empty() && selectedPorts.empty()) {
-            tagX = panelX + 30;
-        }
-
-        for (const std::string& company : selectedCompanies) {
-            sf::Text tempText(company, font, 12);
-            float width = tempText.getLocalBounds().width + 20;
-
-            if (tagX + width > panelX + 30 + maxWidth) {
-                tagX = panelX + 30;
-                tagY += tagHeight + tagSpacing;
-            }
-            maxY = std::max(maxY, tagY + tagHeight);
-            tagX += width + tagSpacing;
-        }
-
-        // 3. Calculate Final Button Y (Logic copied from draw())
-        // In draw(): resultsY = std::min(winH - 180, tagsEndY + 100);
-        //            navY = resultsY - 50;
-        
-        // Note: tagsEndY in draw() is actually maxY here.
-        float resultsY = std::min(winH - 180, maxY + 100);
-        return resultsY - 50;
-    }    
-
     void drawOriginDestDropdown(sf::RenderWindow& window,
                                const Graph& graph,
                                const sf::Font& font,
@@ -832,7 +788,14 @@ private:
             if (skip < portListOffset) { skip++; continue; }
             if (visibleIndex >= 6) break;
             
-            bool isSelected = std::find(selectedPorts.begin(), selectedPorts.end(), i) != selectedPorts.end();
+            // Linear search for selected port
+            bool isSelected = false;
+            for (int j = 0; j < selectedPorts.size(); j++) {
+                if (selectedPorts[j] == i) {
+                    isSelected = true;
+                    break;
+                }
+            }
             
             sf::Text itemTxt(graph.vertices[i].port.name, font, 14);
             itemTxt.setPosition(panelX + 40, yPosition + visibleIndex * 32 + 5);
@@ -874,8 +837,14 @@ private:
             if (skip < companyListOffset) { skip++; continue; }
             if (visibleIndex >= 6) break;
             
-            bool isSelected = std::find(selectedCompanies.begin(), selectedCompanies.end(), 
-                                       allCompanies[i]) != selectedCompanies.end();
+            // Linear search for selected company
+            bool isSelected = false;
+            for (int j = 0; j < selectedCompanies.size(); j++) {
+                if (selectedCompanies[j] == allCompanies[i]) {
+                    isSelected = true;
+                    break;
+                }
+            }
             
             sf::Text itemTxt(allCompanies[i], font, 14);
             itemTxt.setPosition(panelX + 40, yPosition + visibleIndex * 32 + 5);
@@ -903,7 +872,6 @@ private:
                  const Graph& graph,
                  const sf::Font& font,
                  float panelX) {
-        // Update and draw port tags
         portTags.clear();
         portTagTexts.clear();
         
@@ -924,7 +892,6 @@ private:
             float tagWidth = textBounds.width + 20;
             float tagHeight = 25;
             
-            // Check if we need to wrap to next line
             if (tagX + tagWidth > panelX + 30 + maxWidth) {
                 tagX = panelX + 30;
                 tagY += tagHeight + tagSpacing;
@@ -944,17 +911,23 @@ private:
             tagX += tagWidth + tagSpacing;
         }
         
-        // Update company tags
         companyTags.clear();
         companyTagTexts.clear();
         
-        // Start company tags below port tags
-        if (!selectedPorts.empty()) {
-            tagY += 30; // Space after port tags
+        if (selectedPorts.size() > 0) {
+            // Updated spacing logic to match simulate
+            float maxPortY = tagStartY;
+            for(int i = 0; i < portTags.size(); i++) {
+                float y = portTags[i].getPosition().y + portTags[i].getSize().y;
+                if (y > maxPortY) maxPortY = y;
+            }
+            tagY = maxPortY + 10;
         }
+        
         tagX = panelX + 30;
         
-        for (const std::string& company : selectedCompanies) {
+        for (int i = 0; i < selectedCompanies.size(); i++) {
+            const std::string& company = selectedCompanies[i];
             sf::Text tagText(company, font, 12);
             tagText.setFillColor(sf::Color::White);
             
@@ -962,7 +935,6 @@ private:
             float tagWidth = textBounds.width + 20;
             float tagHeight = 25;
             
-            // Check if we need to wrap to next line
             if (tagX + tagWidth > panelX + 30 + maxWidth) {
                 tagX = panelX + 30;
                 tagY += tagHeight + tagSpacing;
@@ -982,24 +954,24 @@ private:
             tagX += tagWidth + tagSpacing;
         }
         
-        // Draw all tags
-        for (size_t i = 0; i < portTags.size(); i++) {
+        for (int i = 0; i < portTags.size(); i++) {
             window.draw(portTags[i]);
             window.draw(portTagTexts[i]);
         }
         
-        for (size_t i = 0; i < companyTags.size(); i++) {
+        for (int i = 0; i < companyTags.size(); i++) {
             window.draw(companyTags[i]);
             window.draw(companyTagTexts[i]);
         }
         
-        // Return the Y position where tags end
         float maxY = tagStartY;
-        for (const auto& tag : portTags) {
-            maxY = std::max(maxY, tag.getPosition().y + tag.getSize().y);
+        for (int i = 0; i < portTags.size(); i++) {
+            float y = portTags[i].getPosition().y + portTags[i].getSize().y;
+            if (y > maxY) maxY = y;
         }
-        for (const auto& tag : companyTags) {
-            maxY = std::max(maxY, tag.getPosition().y + tag.getSize().y);
+        for (int i = 0; i < companyTags.size(); i++) {
+            float y = companyTags[i].getPosition().y + companyTags[i].getSize().y;
+            if (y > maxY) maxY = y;
         }
         return maxY;
     }

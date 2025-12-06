@@ -2,7 +2,7 @@
 #define PORTINITIALIZER_HPP
 
 #include <SFML/Graphics.hpp>
-#include <vector>
+#include "vector.h"
 #include "Graph.hpp"
 
 class PortInitializer {
@@ -10,9 +10,9 @@ public:
     static void initializePorts(const Graph& graph,
                                const sf::Texture& portTexture,
                                const sf::Font& font,
-                               const std::vector<sf::Vector2f>& positions,
-                               std::vector<sf::Sprite>& portSprites,
-                               std::vector<sf::Text>& labels,
+                               const Vector<sf::Vector2f>& positions,
+                               Vector<sf::Sprite>& portSprites,
+                               Vector<sf::Text>& labels,
                                float baseScale) {
         portSprites.resize(graph.size);
         labels.resize(graph.size);
@@ -48,7 +48,7 @@ public:
         }
     }
 
-    static std::vector<sf::Vector2f> getDefaultPositions() {
+    static Vector<sf::Vector2f> getDefaultPositions() {
         return {
             {1150.f, 330.f}, {1050.f, 300.f}, {730.f, 170.f}, {790.f, 200.f}, {925.f, 350.f},
             {1120.f, 420.f}, {1400.f, 630.f}, {1350.f, 650.f}, {490.f, 200.f}, {970.f, 310.f},

@@ -2,10 +2,10 @@
 #define VISUALRENDERER_HPP
 
 #include <SFML/Graphics.hpp>
-#include <vector>
 #include "Graph.hpp"
 #include "pathFinding.h"
 #include "uiHelpers.hpp"
+#include "vector.h"
 
 class VisualRenderer
 {
@@ -18,7 +18,7 @@ public:
 
     static void drawPath(sf::RenderWindow &window,
                          PathFinding::PathResult *currentPathResult,
-                         const std::vector<sf::Vector2f> &positions)
+                         const Vector<sf::Vector2f> &positions)
     {
         if (currentPathResult && currentPathResult->found)
         {
@@ -38,14 +38,15 @@ public:
 
     static void drawPorts(sf::RenderWindow &window,
                           const Graph &graph,
-                          std::vector<sf::Sprite> &portSprites,
-                          std::vector<sf::Text> &labels,
-                          const std::vector<sf::Vector2f> &positions,
+                          Vector<sf::Sprite> &portSprites,
+                          Vector<sf::Text> &labels,
+                          const Vector<sf::Vector2f> &positions,
                           PathFinding::PathResult *currentPathResult,
                           const sf::Vector2f &mouseGlobal,
                           float baseScale,
                           bool panelOpen,
-                          float panelWidth)
+                          float panelWidth,
+                          const Vector<int> &preferredPorts = Vector<int>())
     {
         for (int i = 0; i < graph.size; i++)
         {
@@ -68,6 +69,15 @@ public:
 
                 float currentScale = baseScale;
                 sf::Color tintColor = sf::Color::White;
+                
+                // Check if port is a preferred port
+                bool isPreferredPort = false;
+                for (int prefPort : preferredPorts) {
+                    if (prefPort == i) {
+                        isPreferredPort = true;
+                        break;
+                    }
+                }
 
                 if (inPath)
                 {
@@ -79,6 +89,12 @@ public:
                     tintColor = sf::Color::Green;
                     currentScale = baseScale * 1.3f;
                 }
+                else if (isPreferredPort)
+                {
+                    // Highlight preferred ports with orange/cyan color
+                    tintColor = sf::Color(255, 165, 0); // Orange
+                    currentScale = baseScale * 1.2f;
+                }
                 else
                 {
                     tintColor = sf::Color(200, 255, 255);
@@ -89,11 +105,17 @@ public:
                     currentScale *= 1.4f;
                     labels[i].setFillColor(sf::Color::Yellow);
                     labels[i].setStyle(sf::Text::Bold);
-                    tintColor = sf::Color(255, 255, 0);
+                    if (!inPath && !isEndNode) {
+                        tintColor = sf::Color(255, 255, 0); // Yellow on hover
+                    }
                 }
                 else
                 {
-                    labels[i].setFillColor(sf::Color::White);
+                    if (isPreferredPort) {
+                        labels[i].setFillColor(sf::Color(255, 200, 100)); // Light orange for preferred ports
+                    } else {
+                        labels[i].setFillColor(sf::Color::White);
+                    }
                     labels[i].setStyle(sf::Text::Regular);
                 }
 

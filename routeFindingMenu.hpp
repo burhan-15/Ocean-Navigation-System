@@ -3,7 +3,6 @@
 
 #include <SFML/Graphics.hpp>
 #include <sstream>
-#include <vector>
 #include "Graph.hpp"
 #include "pathFinding.h"
 #include "uiHelpers.hpp"

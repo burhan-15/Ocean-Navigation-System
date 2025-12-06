@@ -5,6 +5,7 @@
 #include "priorityQueue.h"
 #include "linkedList.h"
 #include "timeUtils.h"
+#include "vector.h"
 #include <limits.h>
 
 class PathFinding {
@@ -253,7 +254,7 @@ public:
             // If we have route legs, compute totalCost including layover fees and totalTime
             if (revRoutes.getSize() > 0) {
                 // revRoutes is in reverse (last leg at index 0), so build a forward vector
-                std::vector<Route> legs;
+                Vector<Route> legs;
                 for (int i = revRoutes.getSize() - 1; i >= 0; i--) legs.push_back(revRoutes.get(i));
 
                 long long startT = TimeUtils::toAbsoluteMinutes(legs.front().date, legs.front().deptTime);
@@ -264,7 +265,7 @@ public:
                 totalCost += legs.front().cost;
 
                 // iterate remaining legs and compute waiting & layover fee same as cheapest
-                for (size_t i = 1; i < legs.size(); ++i) {
+                for (int i = 1; i < legs.size(); ++i) {
                     Route &r = legs[i];
 
                     long long depAbs = TimeUtils::toAbsoluteMinutes(r.date, r.deptTime);
