@@ -11,7 +11,7 @@ private:
     int capacity;
     int count;
 
-    void resize(int newCapacity) {
+    void resizeCapacity(int newCapacity) {
         T* newData = new T[newCapacity];
         for (int i = 0; i < count; i++) {
             newData[i] = data[i];
@@ -76,7 +76,7 @@ public:
     void push_back(const T& value) {
         if (count >= capacity) {
             int newCapacity = (capacity == 0) ? 4 : capacity * 2;
-            resize(newCapacity);
+            resizeCapacity(newCapacity);
         }
         data[count++] = value;
     }
@@ -155,7 +155,7 @@ public:
         *this = other;
     }
     
-    // Resize to new size (public method, different from private resize)
+    // Resize to new size (public method)
     void resize(int newSize) {
         if (newSize < 0) {
             throw std::out_of_range("Size cannot be negative");
@@ -165,7 +165,7 @@ public:
             while (newCapacity < newSize) {
                 newCapacity *= 2;
             }
-            resize(newCapacity);
+            resizeCapacity(newCapacity);
         }
         // If newSize > count, new elements are default-constructed
         // If newSize < count, elements are removed

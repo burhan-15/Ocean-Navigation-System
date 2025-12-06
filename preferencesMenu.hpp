@@ -552,7 +552,7 @@ private:
         int visibleIndex = 0;
         int skip = 0;
         
-        for (size_t i = 0; i < allCompanies.size(); i++) {
+        for (int i = 0; i < allCompanies.size(); i++) {
             if (skip < companyListOffset) { skip++; continue; }
             if (visibleIndex >= visibleItems) break;
             
@@ -833,7 +833,7 @@ private:
         
         int visibleIndex = 0;
         int skip = 0;
-        for (size_t i = 0; i < allCompanies.size(); i++) {
+        for (int i = 0; i < allCompanies.size(); i++) {
             if (skip < companyListOffset) { skip++; continue; }
             if (visibleIndex >= 6) break;
             

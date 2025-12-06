@@ -18,7 +18,8 @@ public:
 
     static void drawPath(sf::RenderWindow &window,
                          PathFinding::PathResult *currentPathResult,
-                         const Vector<sf::Vector2f> &positions)
+                         const Vector<sf::Vector2f> &positions,
+                         bool useDottedLines = false)
     {
         if (currentPathResult && currentPathResult->found)
         {
@@ -29,8 +30,15 @@ public:
 
                 if (u >= 0 && u < (int)positions.size() && v >= 0 && v < (int)positions.size())
                 {
-                    drawThickLine(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150));
-                    drawThickLine(window, positions[u], positions[v], 3.f, sf::Color(255, 0, 255));
+                    if (useDottedLines) {
+                        // Draw dotted lines for simulation
+                        drawDottedLine(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150), 12.f, 6.f);
+                        drawDottedLine(window, positions[u], positions[v], 3.f, sf::Color(255, 0, 255), 12.f, 6.f);
+                    } else {
+                        // Draw solid lines for normal path
+                        drawThickLine(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150));
+                        drawThickLine(window, positions[u], positions[v], 3.f, sf::Color(255, 0, 255));
+                    }
                 }
             }
         }
@@ -46,7 +54,8 @@ public:
                           float baseScale,
                           bool panelOpen,
                           float panelWidth,
-                          const Vector<int> &preferredPorts = Vector<int>())
+                          const Vector<int> &preferredPorts = Vector<int>(),
+                          PathFinding::PathResult *highlightPathResult = nullptr)
     {
         for (int i = 0; i < graph.size; i++)
         {
@@ -55,6 +64,10 @@ public:
             {
                 bool inPath = false;
                 bool isEndNode = false;
+                bool inHighlightPath = false;
+                bool isHighlightEndNode = false;
+                
+                // Check current path result
                 if (currentPathResult && currentPathResult->found)
                 {
                     for (int k = 0; k < currentPathResult->path.getSize(); k++)
@@ -64,6 +77,19 @@ public:
                                 isEndNode = true;
                             else
                                 inPath = true;
+                        }
+                }
+                
+                // Check highlight path (for boat simulation)
+                if (highlightPathResult && highlightPathResult->found)
+                {
+                    for (int k = 0; k < highlightPathResult->path.getSize(); k++)
+                        if (highlightPathResult->path.get(k) == i)
+                        {
+                            if (k == 0 || k == highlightPathResult->path.getSize() - 1)
+                                isHighlightEndNode = true;
+                            else
+                                inHighlightPath = true;
                         }
                 }
 
@@ -79,7 +105,22 @@ public:
                     }
                 }
 
-                if (inPath)
+                // Priority: Highlight path > Current path > End nodes > Preferred ports
+                if (inHighlightPath || isHighlightEndNode)
+                {
+                    // Enhanced visualization for boat simulation route
+                    if (isHighlightEndNode)
+                    {
+                        tintColor = sf::Color(0, 255, 0); // Bright green for start/end
+                        currentScale = baseScale * 1.8f;
+                    }
+                    else
+                    {
+                        tintColor = sf::Color(100, 200, 255); // Bright cyan for intermediate ports
+                        currentScale = baseScale * 1.6f;
+                    }
+                }
+                else if (inPath)
                 {
                     tintColor = sf::Color(255, 100, 100);
                     currentScale = baseScale * 1.3f;
@@ -105,18 +146,26 @@ public:
                     currentScale *= 1.4f;
                     labels[i].setFillColor(sf::Color::Yellow);
                     labels[i].setStyle(sf::Text::Bold);
-                    if (!inPath && !isEndNode) {
+                    if (!inPath && !isEndNode && !inHighlightPath && !isHighlightEndNode) {
                         tintColor = sf::Color(255, 255, 0); // Yellow on hover
                     }
                 }
                 else
                 {
-                    if (isPreferredPort) {
+                    // Set label colors based on port type
+                    if (inHighlightPath || isHighlightEndNode) {
+                        labels[i].setFillColor(sf::Color(255, 255, 200)); // Light yellow for highlighted route
+                        labels[i].setStyle(sf::Text::Bold);
+                    } else if (isPreferredPort) {
                         labels[i].setFillColor(sf::Color(255, 200, 100)); // Light orange for preferred ports
+                        labels[i].setStyle(sf::Text::Regular);
+                    } else if (inPath || isEndNode) {
+                        labels[i].setFillColor(sf::Color::White);
+                        labels[i].setStyle(sf::Text::Bold);
                     } else {
                         labels[i].setFillColor(sf::Color::White);
+                        labels[i].setStyle(sf::Text::Regular);
                     }
-                    labels[i].setStyle(sf::Text::Regular);
                 }
 
                 portSprites[i].setScale(currentScale, currentScale);

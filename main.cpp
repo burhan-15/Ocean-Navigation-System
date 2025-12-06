@@ -20,6 +20,7 @@
 #include "bookingMenu.hpp"
 #include "portInitializer.hpp"
 #include "uiPanel.hpp"
+#include "boatSimulationMenu.hpp"
 
 using namespace std;
 
@@ -70,11 +71,11 @@ int main() {
     string resultTextString = "";
 
     // --- PORT POSITIONS ---
-    vector<sf::Vector2f> positions = PortInitializer::getDefaultPositions();
+    Vector<sf::Vector2f> positions = PortInitializer::getDefaultPositions();
 
     // --- VISUAL ELEMENTS: NODES (SPRITES) ---
-    vector<sf::Sprite> portSprites;
-    vector<sf::Text> labels;
+    Vector<sf::Sprite> portSprites;
+    Vector<sf::Text> labels;
     float baseScale = 0.15f;
     
     PortInitializer::initializePorts(graph, portTexture, font, positions, 
@@ -90,18 +91,26 @@ int main() {
     RouteFindingMenu routeMenu(font);
     PreferencesMenu preferencesMenu(graph, font);
     BookingMenu bookingMenu(graph, font);
+    BoatSimulationMenu boatSimMenu(font);
+    
+    // Clock for delta time
+    sf::Clock clock;
 
     // --- MAIN LOOP ---
     while (window.isOpen()) {
         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
         sf::Vector2f mouseGlobal = window.mapPixelToCoords(mousePos);
 
+        // Calculate delta time
+        float deltaTime = clock.restart().asSeconds();
+        
         // UI Positioning
         uiPanel.updatePositions();
         mainMenu.updatePositions(uiPanel.panelX);
         routeMenu.updatePositions(uiPanel.panelX, winH);
         preferencesMenu.updatePositions(uiPanel.panelX, winH);
         bookingMenu.updatePositions(uiPanel.panelX, winH);
+        boatSimMenu.updatePositions(uiPanel.panelX, winH);
 
         sf::Event e;
         while (window.pollEvent(e)) {
@@ -115,6 +124,7 @@ int main() {
                     uiPanel.panelOpen = !uiPanel.panelOpen;
                 }
             }
+            
 
             if (e.type == sf::Event::MouseWheelScrolled) {
                 if (uiPanel.panelOpen) {
@@ -150,6 +160,7 @@ int main() {
                         routeMenu.reset();
                         preferencesMenu.reset();
                         bookingMenu.reset();
+                        boatSimMenu.reset();
                         // Check if currentPathResult is in filteredRoutes or availableRoutes before deleting
                         bool isInFiltered = false;
                         for (int i = 0; i < preferencesMenu.filteredRoutes.size(); i++) {
@@ -175,6 +186,10 @@ int main() {
                         int menuChoice = mainMenu.handleClick(mouseGlobal);
                         if (menuChoice > 0) {
                             currentMenu = menuChoice;
+                            // Initialize boat simulation menu when opened
+                            if (menuChoice == 4) {
+                                boatSimMenu.initializeRoute();
+                            }
                         }
                     }
                     else if (currentMenu == 1) {
@@ -189,20 +204,49 @@ int main() {
                         bookingMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, font,
                                               currentPathResult, resultTextString);
                     }
+                    else if (currentMenu == 4) {
+                        boatSimMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, positions);
+                    }
                 }
             }
         }
 
         // --- ANIMATION ---
         uiPanel.updateAnimation();
+        boatSimMenu.update(deltaTime, positions);
 
         // --- RENDER ---
         VisualRenderer::drawMap(window, mapSprite);
-        VisualRenderer::drawPath(window, currentPathResult, positions);
+        
+        // Draw path for boat simulation if active
+        PathFinding::PathResult* boatSimPath = nullptr;
+        bool useDottedLines = false;
+        
+        if (currentMenu == 4 && boatSimMenu.currentRouteIndex >= 0 && 
+            boatSimMenu.currentRouteIndex < BookingSystem::bookedRoutes.size()) {
+            BookedRoute& route = BookingSystem::bookedRoutes[boatSimMenu.currentRouteIndex];
+            if (route.path && route.path->found) {
+                boatSimPath = route.path;
+                useDottedLines = boatSimMenu.isAnimating; // Use dotted lines during simulation
+                VisualRenderer::drawPath(window, route.path, positions, useDottedLines);
+            }
+        } else {
+            VisualRenderer::drawPath(window, currentPathResult, positions, false);
+        }
+        
+        // Pass boat simulation path for port highlighting
+        PathFinding::PathResult* highlightPath = (currentMenu == 4 && boatSimPath) ? boatSimPath : nullptr;
+        
         VisualRenderer::drawPorts(window, graph, portSprites, labels, positions, 
                                  currentPathResult, mouseGlobal, baseScale, 
                                  uiPanel.panelOpen, uiPanel.panelWidth,
-                                 preferencesMenu.selectedPorts);
+                                 preferencesMenu.selectedPorts,
+                                 highlightPath);
+        
+        // Draw boat if simulating
+        if (currentMenu == 4 && boatSimMenu.isAnimating) {
+            window.draw(boatSimMenu.boatSprite);
+        }
 
         // Draw Panel
         uiPanel.draw(window, currentMenu);
@@ -223,6 +267,9 @@ int main() {
                 else if (currentMenu == 3) {
                     bookingMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH,
                                    currentPathResult, resultTextString);
+                }
+                else if (currentMenu == 4) {
+                    boatSimMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH, positions);
                 }
             }
         }

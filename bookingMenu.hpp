@@ -644,16 +644,6 @@ struct BookingMenu {
     void updateCurrentPathResult(PathFinding::PathResult*& currentPathResult) {
         if (availableRoutes.size() > 0 && currentRouteIndex >= 0 && 
             currentRouteIndex < availableRoutes.size()) {
-            // Check if current path is already in available routes
-            bool isInAvailable = false;
-            if (currentPathResult) {
-                for (int i = 0; i < availableRoutes.size(); i++) {
-                    if (availableRoutes[i] == currentPathResult) {
-                        isInAvailable = true;
-                        break;
-                    }
-                }
-            }
             // Just set to the current route - don't delete anything
             // currentPathResult should already be nullptr from findDirectPaths/findConnectedPaths
             currentPathResult = availableRoutes[currentRouteIndex];
