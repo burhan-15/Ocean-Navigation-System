@@ -1,8 +1,26 @@
-#include "Graph.h"
+#ifndef GRAPH_HPP
+#define GRAPH_HPP
+
+#include <string>
 #include <fstream>
 #include <sstream>
+#include "Vertex.hpp"
 using namespace std;
 
+class Graph {
+public:
+    Vertex* vertices;
+    int size;
+
+    Graph();
+    ~Graph();
+
+    void addPorts(std::string file);
+    void addRoutes(std::string file);
+    int findPort(const std::string& name);
+};
+
+// Implementation
 Graph::Graph() {
     vertices = nullptr;
     size = 0;
@@ -62,3 +80,7 @@ void Graph::addRoutes(string fileName) {
         vertices[u].routes.insertEnd(r);
     }
 }
+
+#endif
+
+

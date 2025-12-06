@@ -1,7 +1,7 @@
 #ifndef PATHFINDING_H
 #define PATHFINDING_H
 
-#include "Graph.h"
+#include "Graph.hpp"
 #include "priorityQueue.h"
 #include "linkedList.h"
 #include "timeUtils.h"
