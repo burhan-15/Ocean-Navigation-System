@@ -144,7 +144,7 @@ int main() {
                     else if (preferencesMenu.selectingCompanies) {
                         preferencesMenu.handleMouseWheel(e.mouseWheelScroll.delta, false, false, graph);
                     }
-                    else if (bookingMenu.selectingOrigin || bookingMenu.selectingDest || bookingMenu.selectingDate) {
+                    else if (bookingMenu.selectingOrigin || bookingMenu.selectingDest || bookingMenu.selectingDate || bookingMenu.showingRouteDetails) {
                         bookingMenu.handleMouseWheel(e.mouseWheelScroll.delta, graph);
                     }
                     else if (multiLegMenu.selectingOrigin || multiLegMenu.selectingDest) {

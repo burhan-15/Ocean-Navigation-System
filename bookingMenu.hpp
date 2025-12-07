@@ -46,6 +46,22 @@ struct BookingMenu {
     sf::Text showSubgraphBtnTxt;
     bool showSubgraph;
     
+    // Show Route Details button
+    sf::RectangleShape showDetailsBtn;
+    sf::Text showDetailsBtnTxt;
+    bool showingRouteDetails;
+    
+    // Route Details display
+    sf::RectangleShape detailsArea;
+    sf::Text detailsHeader;
+    sf::Text detailsBody;
+    sf::RectangleShape detailsBackBtn;
+    sf::Text detailsBackBtnTxt;
+    float detailsScrollOffset;
+    sf::RenderTexture detailsRenderTexture;
+    bool detailsTextureInitialized;
+    sf::Font arialFont;
+    
     // Navigation buttons
     sf::RectangleShape prevBtn;
     sf::RectangleShape nextBtn;
@@ -93,6 +109,11 @@ struct BookingMenu {
           showSubgraphBtn(sf::Vector2f(340.f, 50.f)),
           showSubgraphBtnTxt(),
           showSubgraph(false),
+          showDetailsBtn(sf::Vector2f(340.f, 50.f)),
+          showDetailsBtnTxt(),
+          showingRouteDetails(false),
+          detailsScrollOffset(0.0f),
+          detailsTextureInitialized(false),
           prevBtn(sf::Vector2f(50.f, 40.f)),
           nextBtn(sf::Vector2f(50.f, 40.f)),
           prevBtnTxt(),
@@ -165,6 +186,41 @@ struct BookingMenu {
         showSubgraphBtnTxt.setCharacterSize(15);
         showSubgraphBtnTxt.setFillColor(sf::Color::White);
         
+        // Setup show route details button
+        showDetailsBtn.setFillColor(btnNormal);
+        showDetailsBtnTxt.setFont(font);
+        showDetailsBtnTxt.setString("Show Route Details");
+        showDetailsBtnTxt.setCharacterSize(15);
+        showDetailsBtnTxt.setFillColor(sf::Color::White);
+        
+        // Setup route details display
+        detailsArea.setFillColor(sf::Color::Black);
+        detailsArea.setOutlineColor(sf::Color(0, 150, 200));
+        detailsArea.setOutlineThickness(2.f);
+        
+        // Load Arial font for details area
+        if ( !arialFont.loadFromFile("Arial.ttf")) {
+            // Fallback to passed font if Arial not found
+            arialFont = font;
+        }
+        
+        detailsHeader.setFont(arialFont);
+        detailsHeader.setString("Route Details");
+        detailsHeader.setCharacterSize(24);
+        detailsHeader.setFillColor(sf::Color(0, 255, 200));
+        detailsHeader.setStyle(sf::Text::Bold);
+        detailsBody.setFont(arialFont);
+        detailsBody.setCharacterSize(20);
+        detailsBody.setFillColor(sf::Color::White);
+        detailsBody.setLineSpacing(1.0f);
+        detailsBody.setOutlineColor(sf::Color::White);
+        detailsBackBtn.setSize(sf::Vector2f(100.f, 40.f));
+        detailsBackBtn.setFillColor(btnNormal);
+        detailsBackBtnTxt.setFont(font);
+        detailsBackBtnTxt.setString("Back");
+        detailsBackBtnTxt.setCharacterSize(16);
+        detailsBackBtnTxt.setFillColor(sf::Color::White);
+        
         // Setup navigation buttons
         prevBtn.setFillColor(btnNormal);
         nextBtn.setFillColor(btnNormal);
@@ -218,6 +274,18 @@ struct BookingMenu {
         showSubgraphBtn.setPosition(panelX + 30, startY + 270);
         showSubgraphBtnTxt.setPosition(panelX + 70, startY + 285);
         
+        showDetailsBtn.setPosition(panelX + 30, startY + 330);
+        showDetailsBtnTxt.setPosition(panelX + 70, startY + 345);
+        
+        // Route details positions
+        float detailsAreaHeight = winH - 120 - 120; // Leave space at top (100) and bottom (120 for back button)
+        detailsArea.setSize(sf::Vector2f(360.f, detailsAreaHeight));
+        detailsArea.setPosition(panelX + 20, 100);
+        detailsHeader.setPosition(panelX + 30, 110);
+        detailsBody.setPosition(panelX + 30, 150); // More space below larger header
+        detailsBackBtn.setPosition(panelX + 130, winH - 100);
+        detailsBackBtnTxt.setPosition(panelX + 160, winH - 95);
+        
         // Navigation buttons
         prevBtn.setPosition(panelX + 30, winH - 230);
         nextBtn.setPosition(panelX + 320, winH - 230);
@@ -231,7 +299,22 @@ struct BookingMenu {
     }
 
     void handleMouseWheel(float delta, const Graph& graph) {
-        if (selectingOrigin || selectingDest) {
+        if (showingRouteDetails) {
+            // Handle scrolling in route details view
+            // In SFML, delta > 0 means scrolling up (wheel forward), delta < 0 means scrolling down (wheel backward)
+            // When scrolling up, we want to see content above (decrease offset, move text up)
+            // When scrolling down, we want to see content below (increase offset, move text down)
+            float scrollSpeed = 60.0f; // Increased for better responsiveness with larger font
+            if (delta > 0) {
+                // Scroll up (wheel forward) - show content above (decrease offset)
+                detailsScrollOffset -= scrollSpeed;
+            } else {
+                // Scroll down (wheel backward) - show content below (increase offset)
+                detailsScrollOffset += scrollSpeed;
+            }
+            // Clamp will be done in draw() based on actual content height
+        }
+        else if (selectingOrigin || selectingDest) {
             int availableItems = 0;
             for (int i = 0; i < graph.size; i++) {
                 if ((selectingOrigin && i == selectedDestIndex) || 
@@ -366,6 +449,21 @@ struct BookingMenu {
                     PathFinding::PathResult*& currentPathResult,
                     std::string& resultTextString,
                     bool& panelShouldClose) {
+        // Handle route details back button FIRST when showing details (prevents click-through)
+        if (showingRouteDetails) {
+            // Update button position before checking (in case positions weren't updated)
+            detailsBackBtn.setPosition(panelX + 130, winH - 100);
+            detailsBackBtnTxt.setPosition(panelX + 160, winH - 95);
+            
+            if (detailsBackBtn.getGlobalBounds().contains(mouseGlobal)) {
+                showingRouteDetails = false;
+                detailsScrollOffset = 0.0f;  // Reset scroll when closing
+                return true;
+            }
+            // Don't handle any other clicks when showing details
+            return false;
+        }
+        
         // Handle origin/destination selection
         if (selectingOrigin || selectingDest) {
             return handleOriginDestSelectionClick(graph, mouseGlobal, panelX);
@@ -394,6 +492,7 @@ struct BookingMenu {
         // Handle option buttons
         else if (directPathsBtn.getGlobalBounds().contains(mouseGlobal)) {
             if (selectedOriginIndex != -1 && selectedDestIndex != -1 && !departureDate.empty()) {
+                showingRouteDetails = false;  // Reset details view when searching
                 findDirectPaths(graph, currentPathResult);
                 updateCurrentPathResult(currentPathResult);
             }
@@ -401,6 +500,7 @@ struct BookingMenu {
         }
         else if (connectedPathsBtn.getGlobalBounds().contains(mouseGlobal)) {
             if (selectedOriginIndex != -1 && selectedDestIndex != -1 && !departureDate.empty()) {
+                showingRouteDetails = false;  // Reset details view when searching
                 findConnectedPaths(graph, currentPathResult);
                 updateCurrentPathResult(currentPathResult);
             }
@@ -418,6 +518,15 @@ struct BookingMenu {
             if (availableRoutes.size() > 0 && currentRouteIndex >= 0 && currentPathResult && currentPathResult->found) {
                 showSubgraph = true;
                 panelShouldClose = true;
+                return true;
+            }
+        }
+        // Handle show route details button
+        else if (showDetailsBtn.getGlobalBounds().contains(mouseGlobal)) {
+            if (availableRoutes.size() > 0 && currentRouteIndex >= 0 && currentPathResult && currentPathResult->found) {
+                showingRouteDetails = true;
+                detailsScrollOffset = 0.0f;  // Reset scroll when opening details
+                updateRouteDetails(graph, currentPathResult);
                 return true;
             }
         }
@@ -689,6 +798,44 @@ struct BookingMenu {
         }
     }
     
+    void updateRouteDetails(const Graph& graph, PathFinding::PathResult* currentPathResult) {
+        if (!currentPathResult || !currentPathResult->found) {
+            detailsBody.setString("No route selected");
+            return;
+        }
+        
+        std::stringstream ss;
+        ss << "Total Cost: $" << currentPathResult->totalCost << "\n";
+        ss << "Total Time: " << TimeUtils::formatDuration(currentPathResult->totalTime) << "\n\n";
+        ss << "Journey Legs:\n";
+        ss << "-------------\n\n";
+        
+        if (currentPathResult->routes.getSize() > 0) {
+            for (int i = 0; i < currentPathResult->routes.getSize(); i++) {
+                Route route = currentPathResult->routes.get(i);
+                int toIdx = currentPathResult->path.get(i + 1);
+                
+                ss << "Leg " << (i + 1) << ":\n";
+                ss << "  From: " << route.startPoint.name << "\n";
+                ss << "  To: " << route.dest.name << "\n";
+                ss << "  Date: " << route.date << "\n";
+                ss << "  Departure: " << route.deptTime << "\n";
+                ss << "  Arrival: " << route.arrTime << "\n";
+                ss << "  Route Cost: $" << route.cost << "\n";
+                
+                // Add layover information if not the last leg
+                if (i < currentPathResult->routes.getSize() - 1 && toIdx >= 0 && toIdx < graph.size) {
+                    int layoverCost = graph.vertices[toIdx].port.portCharge;
+                    ss << "  Layover at " << route.dest.name << ": $" << layoverCost << "\n";
+                }
+                
+                ss << "\n";
+            }
+        }
+        
+        detailsBody.setString(ss.str());
+    }
+    
     void updateCurrentPathResult(PathFinding::PathResult*& currentPathResult) {
         if (availableRoutes.size() > 0 && currentRouteIndex >= 0 && 
             currentRouteIndex < availableRoutes.size()) {
@@ -702,6 +849,9 @@ struct BookingMenu {
         if (currentRouteIndex < 0 || currentRouteIndex >= availableRoutes.size()) {
             return;
         }
+        
+        // Reset route details view when booking
+        showingRouteDetails = false;
         
         PathFinding::PathResult* selectedRoute = availableRoutes[currentRouteIndex];
         
@@ -770,6 +920,8 @@ struct BookingMenu {
     void navigatePrevious(PathFinding::PathResult*& currentPathResult,
                          std::string& resultTextString) {
         if (availableRoutes.size() == 0 || currentRouteIndex <= 0) return;
+        // Reset route details view when navigating
+        showingRouteDetails = false;
         
         currentRouteIndex--;
         // currentPathResult should always be one of the routes in availableRoutes
@@ -782,6 +934,8 @@ struct BookingMenu {
                      std::string& resultTextString) {
         if (availableRoutes.size() == 0 || 
             currentRouteIndex >= availableRoutes.size() - 1) return;
+        // Reset route details view when navigating
+        showingRouteDetails = false;
         
         currentRouteIndex++;
         // currentPathResult should always be one of the routes in availableRoutes
@@ -914,9 +1068,74 @@ public:
              const sf::Font& font,
              const sf::Vector2f& mouseGlobal,
              float panelX,
-             float /*winH*/,
+             float winH,
              PathFinding::PathResult* currentPathResult,
              const std::string& /*resultTextString*/) {
+        // If showing route details, only draw details view
+        if (showingRouteDetails) {
+            // Update back button position and area size (in case window size changed)
+            float detailsAreaHeight = winH - 120 - 120; // Leave space at top (100) and bottom (120 for back button)
+            detailsArea.setSize(sf::Vector2f(360.f, detailsAreaHeight));
+            detailsBackBtn.setPosition(panelX + 130, winH - 100);
+            detailsBackBtnTxt.setPosition(panelX + 160, winH - 95);
+            
+            window.draw(detailsArea);
+            window.draw(detailsHeader);
+            
+            // Calculate content height and max scroll
+            // Use getGlobalBounds() after setting position to get accurate height
+            float baseY = 150; // Base position below header
+            detailsBody.setPosition(panelX + 30, baseY); // Reset to base position (below larger header)
+            float contentHeight = detailsBody.getGlobalBounds().height;
+            float visibleHeight = detailsArea.getSize().y - 80; // Leave space for larger header and padding
+            float maxScroll = (contentHeight > visibleHeight) ? (contentHeight - visibleHeight + 20) : 0;
+            
+            // Clamp scroll offset to valid range
+            if (detailsScrollOffset < 0) detailsScrollOffset = 0;
+            if (detailsScrollOffset > maxScroll) detailsScrollOffset = maxScroll;
+            
+            // Apply scroll offset to details body
+            float scrolledY = baseY - detailsScrollOffset;
+            detailsBody.setPosition(panelX + 30, scrolledY);
+            
+            // Use RenderTexture for proper clipping
+            float contentAreaX = panelX + 20;
+            float contentAreaY = baseY;
+            float contentAreaWidth = 360.f;
+            float contentAreaHeight = detailsArea.getPosition().y + detailsArea.getSize().y - contentAreaY - 10;
+            
+            // Create or resize render texture for clipping if needed
+            if (!detailsTextureInitialized || 
+                detailsRenderTexture.getSize().x != (unsigned int)contentAreaWidth || 
+                detailsRenderTexture.getSize().y != (unsigned int)contentAreaHeight) {
+                detailsRenderTexture.create((unsigned int)contentAreaWidth, (unsigned int)contentAreaHeight);
+                detailsTextureInitialized = true;
+            }
+            
+            // Clear and draw to render texture
+            detailsRenderTexture.clear(sf::Color::Transparent);
+            
+            // Adjust text position relative to render texture (subtract contentArea position)
+            float textXRelative = 10; // 10 pixels from left edge of content area
+            float textYRelative = scrolledY - contentAreaY;
+            detailsBody.setPosition(textXRelative, textYRelative);
+            detailsRenderTexture.draw(detailsBody);
+            detailsRenderTexture.display();
+            
+            // Draw the render texture sprite to the window
+            sf::Sprite contentSprite(detailsRenderTexture.getTexture());
+            contentSprite.setPosition(contentAreaX, contentAreaY);
+            window.draw(contentSprite);
+            
+            // Restore text position for next frame calculations
+            detailsBody.setPosition(panelX + 30, scrolledY);
+            
+            detailsBackBtn.setFillColor(isHovering(detailsBackBtn, mouseGlobal) ? btnHover : btnNormal);
+            window.draw(detailsBackBtn);
+            window.draw(detailsBackBtnTxt);
+            return;
+        }
+        
         // Draw fields
         window.draw(fieldOrigin);
         window.draw(fieldDest);
@@ -985,6 +1204,13 @@ public:
                                     btnHover : (canShowSubgraph ? btnNormal : sf::Color(30, 30, 30)));
         window.draw(showSubgraphBtn);
         window.draw(showSubgraphBtnTxt);
+        
+        // Draw show route details button
+        bool canShowDetails = (availableRoutes.size() > 0 && currentRouteIndex >= 0 && currentPathResult && currentPathResult->found);
+        showDetailsBtn.setFillColor((canShowDetails && isHovering(showDetailsBtn, mouseGlobal)) ? 
+                                   btnHover : (canShowDetails ? btnNormal : sf::Color(30, 30, 30)));
+        window.draw(showDetailsBtn);
+        window.draw(showDetailsBtnTxt);
         
         // Draw navigation buttons if routes are available
         if (availableRoutes.size() > 0) {
