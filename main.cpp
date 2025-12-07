@@ -1,7 +1,7 @@
 #include <iostream>
-#include "linkedList.h"
+#include "headers/linkedList.h"
 #include <SFML/Graphics.hpp>
-#include "Graph.hpp"
+#include "headers/Graph.hpp"
 #include <fstream>
 #include <sstream>
 #include <cmath>
@@ -9,27 +9,27 @@
 #include <iomanip>
 
 // Include pathfinding logic
-#include "pathFinding.h"
+#include "headers/pathFinding.h"
 
 // Include UI components
-#include "uiHelpers.hpp"
-#include "visualRenderer.hpp"
-#include "mainMenu.hpp"
-#include "routeFindingMenu.hpp"
-#include "preferencesMenu.hpp"
-#include "bookingMenu.hpp"
-#include "portInitializer.hpp"
-#include "uiPanel.hpp"
-#include "boatSimulationMenu.hpp"
-#include "multiLegJourneyMenu.hpp"
+#include "headers/uiHelpers.hpp"
+#include "headers/visualRenderer.hpp"
+#include "headers/mainMenu.hpp"
+#include "headers/routeFindingMenu.hpp"
+#include "headers/preferencesMenu.hpp"
+#include "headers/bookingMenu.hpp"
+#include "headers/portInitializer.hpp"
+#include "headers/uiPanel.hpp"
+#include "headers/boatSimulationMenu.hpp"
+#include "headers/multiLegJourneyMenu.hpp"
 
 using namespace std;
 
 int main() {
     // --- GRAPH SETUP ---
     Graph graph;
-    graph.addPorts("PortCharges.txt");
-    graph.addRoutes("Routes.txt");
+    graph.addPorts("data/PortCharges.txt");
+    graph.addRoutes("data/Routes.txt");
 
     if (graph.size == 0) {
         cerr << "Error: No ports loaded.\n";
@@ -45,7 +45,7 @@ int main() {
 
     // --- TEXTURES ---
     sf::Texture mapTexture;
-    if (!mapTexture.loadFromFile("world_map.png")) {
+    if (!mapTexture.loadFromFile("assets/world_map.png")) {
         cerr << "ERROR: world_map.png missing! Creating fallback.\n";
         mapTexture.create(winW, winH);
     }
@@ -55,14 +55,14 @@ int main() {
 
     // Load Port Texture
     sf::Texture portTexture;
-    if (!portTexture.loadFromFile("Port.png")) {
+    if (!portTexture.loadFromFile("assets/Port.png")) {
         cerr << "ERROR: Port.png missing! Ensure the file is in the project folder.\n";
         portTexture.create(20, 20);
     }
 
     // --- FONTS ---
     sf::Font font;
-    if (!font.loadFromFile("CinzelDecorative-Regular.ttf")) {
+    if (!font.loadFromFile("assets/CinzelDecorative-Regular.ttf")) {
         cerr << "ERROR: Font missing! (Arial.ttf)\n";
         return 1;
     }

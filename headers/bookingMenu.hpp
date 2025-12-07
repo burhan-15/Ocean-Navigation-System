@@ -199,7 +199,10 @@ struct BookingMenu {
         detailsArea.setOutlineThickness(2.f);
         
         // Load Arial font for details area
-        if ( !arialFont.loadFromFile("Arial.ttf")) {
+        if (!arialFont.loadFromFile("assets/arial.ttf") && 
+            !arialFont.loadFromFile("assets/Arial.ttf") && 
+            !arialFont.loadFromFile("assets/Arial-Regular.ttf") &&
+            !arialFont.loadFromFile("assets/ARIAL.TTF")) {
             // Fallback to passed font if Arial not found
             arialFont = font;
         }

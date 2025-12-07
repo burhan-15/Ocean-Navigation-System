@@ -93,7 +93,7 @@ struct BoatSimulationMenu {
         statusText.setFillColor(sf::Color::Yellow);
         
         // Load boat texture
-        if (!boatTexture.loadFromFile("ship.png")) {
+        if (!boatTexture.loadFromFile("assets/ship.png")) {
             // Create a simple boat shape if texture not found
             boatTexture.create(30, 30);
             sf::Image img;
