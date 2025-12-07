@@ -21,6 +21,7 @@
 #include "portInitializer.hpp"
 #include "uiPanel.hpp"
 #include "boatSimulationMenu.hpp"
+#include "multiLegJourneyMenu.hpp"
 
 using namespace std;
 
@@ -61,7 +62,7 @@ int main() {
 
     // --- FONTS ---
     sf::Font font;
-    if (!font.loadFromFile("Arial.ttf")) {
+    if (!font.loadFromFile("CinzelDecorative-Regular.ttf")) {
         cerr << "ERROR: Font missing! (Arial.ttf)\n";
         return 1;
     }
@@ -92,6 +93,7 @@ int main() {
     PreferencesMenu preferencesMenu(graph, font);
     BookingMenu bookingMenu(graph, font);
     BoatSimulationMenu boatSimMenu(font);
+    MultiLegJourneyMenu multiLegMenu(font);
     
     // Clock for delta time
     sf::Clock clock;
@@ -111,6 +113,7 @@ int main() {
         preferencesMenu.updatePositions(uiPanel.panelX, winH);
         bookingMenu.updatePositions(uiPanel.panelX, winH);
         boatSimMenu.updatePositions(uiPanel.panelX, winH);
+        multiLegMenu.updatePositions(uiPanel.panelX, winH, winW);
 
         sf::Event e;
         while (window.pollEvent(e)) {
@@ -120,7 +123,8 @@ int main() {
                 if (!routeMenu.selectingOrigin && !routeMenu.selectingDest &&
                     !preferencesMenu.selectingOrigin && !preferencesMenu.selectingDest &&
                     !preferencesMenu.selectingPorts && !preferencesMenu.selectingCompanies &&
-                    !bookingMenu.selectingOrigin && !bookingMenu.selectingDest && !bookingMenu.selectingDate) {
+                    !bookingMenu.selectingOrigin && !bookingMenu.selectingDest && !bookingMenu.selectingDate &&
+                    !multiLegMenu.selectingOrigin && !multiLegMenu.selectingDest) {
                     uiPanel.panelOpen = !uiPanel.panelOpen;
                 }
             }
@@ -143,6 +147,9 @@ int main() {
                     else if (bookingMenu.selectingOrigin || bookingMenu.selectingDest || bookingMenu.selectingDate) {
                         bookingMenu.handleMouseWheel(e.mouseWheelScroll.delta, graph);
                     }
+                    else if (multiLegMenu.selectingOrigin || multiLegMenu.selectingDest) {
+                        multiLegMenu.handleMouseWheel(e.mouseWheelScroll.delta, graph);
+                    }
                 }
             }
 
@@ -161,6 +168,7 @@ int main() {
                         preferencesMenu.reset();
                         bookingMenu.reset();
                         boatSimMenu.reset();
+                        multiLegMenu.reset();
                         // Check if currentPathResult is in filteredRoutes or availableRoutes before deleting
                         bool isInFiltered = false;
                         for (int i = 0; i < preferencesMenu.filteredRoutes.size(); i++) {
@@ -186,9 +194,11 @@ int main() {
                         int menuChoice = mainMenu.handleClick(mouseGlobal);
                         if (menuChoice > 0) {
                             currentMenu = menuChoice;
-                            // Initialize boat simulation menu when opened
+                            // Initialize menus when opened
                             if (menuChoice == 4) {
                                 boatSimMenu.initializeRoute();
+                            } else if (menuChoice == 5) {
+                                multiLegMenu.initialize();
                             }
                         }
                     }
@@ -201,11 +211,50 @@ int main() {
                                                    currentPathResult, resultTextString);
                     }
                     else if (currentMenu == 3) {
+                        bool panelShouldClose = false;
                         bookingMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, font,
-                                              currentPathResult, resultTextString);
+                                              currentPathResult, resultTextString, panelShouldClose);
+                        if (panelShouldClose) {
+                            uiPanel.panelOpen = false;
+                        }
                     }
                     else if (currentMenu == 4) {
                         boatSimMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, positions);
+                    }
+                    else if (currentMenu == 5) {
+                        bool panelShouldClose = false;
+                        multiLegMenu.handleClick(graph, mouseGlobal, uiPanel.panelX, winH, panelShouldClose);
+                        if (panelShouldClose) {
+                            uiPanel.panelOpen = false;
+                        }
+                    }
+                }
+            }
+            
+            // Check if multi-leg journey just completed and open panel
+            if (multiLegMenu.showResult && !uiPanel.panelOpen) {
+                uiPanel.panelOpen = true;
+            }
+            
+            // Handle port clicks on map when tracking multi-leg journey
+            if (!uiPanel.panelOpen && multiLegMenu.isTracking) {
+                if (e.type == sf::Event::MouseButtonPressed) {
+                    // First check if clicking on modal
+                    if (multiLegMenu.showModal) {
+                        if (multiLegMenu.handleModalClick(graph, mouseGlobal)) {
+                            // Modal click handled
+                            continue;
+                        }
+                    }
+                    
+                    // If modal not shown, check if clicking on a port
+                    if (!multiLegMenu.showModal) {
+                        for (int i = 0; i < graph.size; i++) {
+                            if (isHovering(portSprites[i], mouseGlobal)) {
+                                multiLegMenu.handleMapPortClick(i, graph);
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -214,6 +263,7 @@ int main() {
         // --- ANIMATION ---
         uiPanel.updateAnimation();
         boatSimMenu.update(deltaTime, positions);
+        multiLegMenu.update(deltaTime);
 
         // --- RENDER ---
         VisualRenderer::drawMap(window, mapSprite);
@@ -230,18 +280,35 @@ int main() {
                 useDottedLines = boatSimMenu.isAnimating; // Use dotted lines during simulation
                 VisualRenderer::drawPath(window, route.path, positions, useDottedLines);
             }
-        } else {
+        } 
+        // Draw path for multi-leg journey if active or completed (show path until user leaves menu)
+        else if (currentMenu == 5 && multiLegMenu.currentPathResult) {
+            VisualRenderer::drawPath(window, multiLegMenu.currentPathResult, positions, false);
+        }
+        else {
             VisualRenderer::drawPath(window, currentPathResult, positions, false);
         }
         
-        // Pass boat simulation path for port highlighting
-        PathFinding::PathResult* highlightPath = (currentMenu == 4 && boatSimPath) ? boatSimPath : nullptr;
+        // Pass boat simulation path or multi-leg journey path for port highlighting
+        PathFinding::PathResult* highlightPath = nullptr;
+        if (currentMenu == 4 && boatSimPath) {
+            highlightPath = boatSimPath;
+        } else if (currentMenu == 5 && multiLegMenu.currentPathResult) {
+            // Highlight all ports in the path (whether tracking or completed)
+            highlightPath = multiLegMenu.currentPathResult;
+        }
+        
+        // Check if subgraph mode should be disabled when panel opens
+        if (currentMenu == 3 && uiPanel.panelOpen && bookingMenu.showSubgraph) {
+            bookingMenu.showSubgraph = false;
+        }
         
         VisualRenderer::drawPorts(window, graph, portSprites, labels, positions, 
                                  currentPathResult, mouseGlobal, baseScale, 
                                  uiPanel.panelOpen, uiPanel.panelWidth,
                                  preferencesMenu.selectedPorts,
-                                 highlightPath);
+                                 highlightPath,
+                                 (currentMenu == 3 && bookingMenu.showSubgraph));
         
         // Draw boat if simulating
         if (currentMenu == 4 && boatSimMenu.isAnimating) {
@@ -271,7 +338,20 @@ int main() {
                 else if (currentMenu == 4) {
                     boatSimMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH, positions);
                 }
+                else if (currentMenu == 5) {
+                    multiLegMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH, winW);
+                }
             }
+        }
+        
+        // Draw multi-leg menu modals even when panel is closed
+        if (multiLegMenu.showModal || multiLegMenu.showResult) {
+            multiLegMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH, winW);
+        }
+        
+        // Draw alert even when panel is closed
+        if (multiLegMenu.showAlert) {
+            multiLegMenu.draw(window, graph, font, mouseGlobal, uiPanel.panelX, winH, winW);
         }
         
         window.display();

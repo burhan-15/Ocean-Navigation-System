@@ -115,7 +115,7 @@ struct BoatSimulationMenu {
         // Button text
         prevText.setPosition(panelX + 45, winH - 42);
         nextText.setPosition(panelX + 165, winH - 42);
-        runSimText.setPosition(panelX + 275, winH - 42);
+        runSimText.setPosition(panelX + 270, winH - 42);
         
         // Route info at top (with more space)
         routeInfoText.setPosition(panelX + 20, 120);

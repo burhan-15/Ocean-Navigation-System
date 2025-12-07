@@ -31,13 +31,13 @@ public:
                 if (u >= 0 && u < (int)positions.size() && v >= 0 && v < (int)positions.size())
                 {
                     if (useDottedLines) {
-                        // Draw dotted lines for simulation
-                        drawDottedLine(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150), 12.f, 6.f);
-                        drawDottedLine(window, positions[u], positions[v], 3.f, sf::Color(255, 0, 255), 12.f, 6.f);
+                        // Draw dotted arrows for simulation
+                        // drawDottedArrow(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150), 12.f, 6.f);
+                        drawDottedArrow(window, positions[u], positions[v], 3.f, sf::Color::Green, 12.f, 6.f);
                     } else {
-                        // Draw solid lines for normal path
-                        drawThickLine(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150));
-                        drawThickLine(window, positions[u], positions[v], 3.f, sf::Color(255, 0, 255));
+                        // Draw solid arrows for normal path
+                        // drawArrow(window, positions[u], positions[v], 6.f, sf::Color(0, 0, 0, 150));
+                        drawArrow(window, positions[u], positions[v], 3.f, sf::Color::Green);
                     }
                 }
             }
@@ -55,10 +55,25 @@ public:
                           bool panelOpen,
                           float panelWidth,
                           const Vector<int> &preferredPorts = Vector<int>(),
-                          PathFinding::PathResult *highlightPathResult = nullptr)
+                          PathFinding::PathResult *highlightPathResult = nullptr,
+                          bool showSubgraph = false)
     {
         for (int i = 0; i < graph.size; i++)
         {
+            // In subgraph mode, only show ports in the current path
+            if (showSubgraph && currentPathResult && currentPathResult->found) {
+                bool inSubgraph = false;
+                for (int k = 0; k < currentPathResult->path.getSize(); k++) {
+                    if (currentPathResult->path.get(k) == i) {
+                        inSubgraph = true;
+                        break;
+                    }
+                }
+                if (!inSubgraph) {
+                    continue; // Skip ports not in the subgraph
+                }
+            }
+            
             bool underPanel = panelOpen && positions[i].x < panelWidth;
             if (!underPanel)
             {
@@ -80,7 +95,7 @@ public:
                         }
                 }
                 
-                // Check highlight path (for boat simulation)
+                // Check highlight path (for boat simulation or multi-leg journey)
                 if (highlightPathResult && highlightPathResult->found)
                 {
                     for (int k = 0; k < highlightPathResult->path.getSize(); k++)
@@ -108,16 +123,16 @@ public:
                 // Priority: Highlight path > Current path > End nodes > Preferred ports
                 if (inHighlightPath || isHighlightEndNode)
                 {
-                    // Enhanced visualization for boat simulation route
+                    // Enhanced visualization for boat simulation or multi-leg journey route
                     if (isHighlightEndNode)
                     {
-                        tintColor = sf::Color(0, 255, 0); // Bright green for start/end
+                        tintColor = sf::Color(0, 255, 0); // Bright green for origin/destination
                         currentScale = baseScale * 1.8f;
                     }
                     else
                     {
-                        tintColor = sf::Color(100, 200, 255); // Bright cyan for intermediate ports
-                        currentScale = baseScale * 1.6f;
+                        tintColor = sf::Color(255, 100, 100); // Red overlay for intermediate ports
+                        currentScale = baseScale * 1.5f;
                     }
                 }
                 else if (inPath)
@@ -138,7 +153,7 @@ public:
                 }
                 else
                 {
-                    tintColor = sf::Color(200, 255, 255);
+                    tintColor = sf::Color(255, 165, 0);
                 }
 
                 if (isHovering(portSprites[i], mouseGlobal))
@@ -177,6 +192,20 @@ public:
 
         for (int i = 0; i < graph.size; i++)
         {
+            // In subgraph mode, only show labels for ports in the current path
+            if (showSubgraph && currentPathResult && currentPathResult->found) {
+                bool inSubgraph = false;
+                for (int k = 0; k < currentPathResult->path.getSize(); k++) {
+                    if (currentPathResult->path.get(k) == i) {
+                        inSubgraph = true;
+                        break;
+                    }
+                }
+                if (!inSubgraph) {
+                    continue; // Skip labels for ports not in the subgraph
+                }
+            }
+            
             bool underPanel = panelOpen && positions[i].x < panelWidth;
             if (!underPanel)
             {

@@ -41,6 +41,11 @@ struct BookingMenu {
     sf::RectangleShape bookBtn;
     sf::Text bookBtnTxt;
     
+    // Show Subgraph button
+    sf::RectangleShape showSubgraphBtn;
+    sf::Text showSubgraphBtnTxt;
+    bool showSubgraph;
+    
     // Navigation buttons
     sf::RectangleShape prevBtn;
     sf::RectangleShape nextBtn;
@@ -80,11 +85,14 @@ struct BookingMenu {
           availableDates(),
           dateListOffset(0),
           directPathsBtn(sf::Vector2f(160.f, 50.f)),
-          connectedPathsBtn(sf::Vector2f(160.f, 50.f)),
+          connectedPathsBtn(sf::Vector2f(170.f, 50.f)),
           directPathsTxt(),
           connectedPathsTxt(),
           bookBtn(sf::Vector2f(340.f, 50.f)),
           bookBtnTxt(),
+          showSubgraphBtn(sf::Vector2f(340.f, 50.f)),
+          showSubgraphBtnTxt(),
+          showSubgraph(false),
           prevBtn(sf::Vector2f(50.f, 40.f)),
           nextBtn(sf::Vector2f(50.f, 40.f)),
           prevBtnTxt(),
@@ -135,20 +143,27 @@ struct BookingMenu {
         
         directPathsTxt.setFont(font);
         directPathsTxt.setString("Direct Paths");
-        directPathsTxt.setCharacterSize(16);
+        directPathsTxt.setCharacterSize(15);
         directPathsTxt.setFillColor(sf::Color::White);
         
         connectedPathsTxt.setFont(font);
         connectedPathsTxt.setString("Connected Paths");
-        connectedPathsTxt.setCharacterSize(16);
+        connectedPathsTxt.setCharacterSize(15);
         connectedPathsTxt.setFillColor(sf::Color::White);
         
         // Setup book button
         bookBtn.setFillColor(btnNormal);
         bookBtnTxt.setFont(font);
         bookBtnTxt.setString("Book Selected Route");
-        bookBtnTxt.setCharacterSize(16);
+        bookBtnTxt.setCharacterSize(15);
         bookBtnTxt.setFillColor(sf::Color::White);
+        
+        // Setup show subgraph button
+        showSubgraphBtn.setFillColor(btnNormal);
+        showSubgraphBtnTxt.setFont(font);
+        showSubgraphBtnTxt.setString("Show Subgraph");
+        showSubgraphBtnTxt.setCharacterSize(15);
+        showSubgraphBtnTxt.setFillColor(sf::Color::White);
         
         // Setup navigation buttons
         prevBtn.setFillColor(btnNormal);
@@ -200,6 +215,9 @@ struct BookingMenu {
         bookBtn.setPosition(panelX + 30, startY + 210);
         bookBtnTxt.setPosition(panelX + 70, startY + 225);
         
+        showSubgraphBtn.setPosition(panelX + 30, startY + 270);
+        showSubgraphBtnTxt.setPosition(panelX + 70, startY + 285);
+        
         // Navigation buttons
         prevBtn.setPosition(panelX + 30, winH - 230);
         nextBtn.setPosition(panelX + 320, winH - 230);
@@ -241,7 +259,7 @@ struct BookingMenu {
         // Use vector to track unique dates (no built-in structures)
         Vector<std::string> dateList;
         
-        // If origin and destination are selected, only show dates for routes between them
+        // If origin and destination are selected, show dates for both direct and connected routes
         if (selectedOriginIndex != -1 && selectedDestIndex != -1) {
             // Check direct routes
             for (int i = 0; i < graph.size; i++) {
@@ -265,6 +283,27 @@ struct BookingMenu {
                     }
                     node = node->next;
                 }
+            }
+            
+            // For connected paths, we only need dates from routes starting at origin
+            // Any connected path will start with one of these routes, so collect all dates
+            // from all routes starting at the origin (we already have direct routes above)
+            // This is much more efficient than exploring all paths
+            LinkedList<Route>::Node* originRouteNode = graph.vertices[selectedOriginIndex].routes.head;
+            while (originRouteNode != nullptr) {
+                Route& route = originRouteNode->data;
+                // Check if date already exists
+                bool exists = false;
+                for (const std::string& d : dateList) {
+                    if (d == route.date) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    dateList.push_back(route.date);
+                }
+                originRouteNode = originRouteNode->next;
             }
         } else {
             // If only origin is selected, show dates from that origin
@@ -325,7 +364,8 @@ struct BookingMenu {
                     float winH,
                     const sf::Font& /*font*/,
                     PathFinding::PathResult*& currentPathResult,
-                    std::string& resultTextString) {
+                    std::string& resultTextString,
+                    bool& panelShouldClose) {
         // Handle origin/destination selection
         if (selectingOrigin || selectingDest) {
             return handleOriginDestSelectionClick(graph, mouseGlobal, panelX);
@@ -370,6 +410,14 @@ struct BookingMenu {
         else if (bookBtn.getGlobalBounds().contains(mouseGlobal)) {
             if (availableRoutes.size() > 0 && currentRouteIndex >= 0) {
                 bookRoute(graph, currentPathResult, resultTextString);
+                return true;
+            }
+        }
+        // Handle show subgraph button
+        else if (showSubgraphBtn.getGlobalBounds().contains(mouseGlobal)) {
+            if (availableRoutes.size() > 0 && currentRouteIndex >= 0 && currentPathResult && currentPathResult->found) {
+                showSubgraph = true;
+                panelShouldClose = true;
                 return true;
             }
         }
@@ -867,7 +915,7 @@ public:
              const sf::Vector2f& mouseGlobal,
              float panelX,
              float /*winH*/,
-             PathFinding::PathResult* /*currentPathResult*/,
+             PathFinding::PathResult* currentPathResult,
              const std::string& /*resultTextString*/) {
         // Draw fields
         window.draw(fieldOrigin);
@@ -930,6 +978,13 @@ public:
                             btnHover : (canBook ? btnNormal : sf::Color(30, 30, 30)));
         window.draw(bookBtn);
         window.draw(bookBtnTxt);
+        
+        // Draw show subgraph button
+        bool canShowSubgraph = (availableRoutes.size() > 0 && currentRouteIndex >= 0 && currentPathResult && currentPathResult->found);
+        showSubgraphBtn.setFillColor((canShowSubgraph && isHovering(showSubgraphBtn, mouseGlobal)) ? 
+                                    btnHover : (canShowSubgraph ? btnNormal : sf::Color(30, 30, 30)));
+        window.draw(showSubgraphBtn);
+        window.draw(showSubgraphBtnTxt);
         
         // Draw navigation buttons if routes are available
         if (availableRoutes.size() > 0) {
